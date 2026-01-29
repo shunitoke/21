@@ -4,6 +4,9 @@ import withPWA from "next-pwa";
 const nextConfig: NextConfig = {
   reactCompiler: true,
   turbopack: {},
+  experimental: {
+    optimizePackageImports: ["lucide-react", "framer-motion", "recharts"],
+  },
 };
 
 const withPWAConfig = withPWA({

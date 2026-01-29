@@ -401,6 +401,28 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
     const persisted = await loadState();
     if (!persisted) {
       const settings = getDefaultSettings();
+      if (settings.demoMode) {
+        set({
+          settings: demoSettings,
+          habits: demoHabits,
+          logs: demoLogs,
+          journal: demoJournal,
+          stopCrane: demoStopCrane,
+          achievements: computeAchievements(demoHabits, demoLogs, demoJournal),
+          loading: false,
+        });
+        await persistState(
+          {
+            settings: demoSettings,
+            habits: demoHabits,
+            logs: demoLogs,
+            journal: demoJournal,
+            stopCrane: demoStopCrane,
+          },
+          true
+        );
+        return;
+      }
       set({
         settings,
         habits: defaultHabits,

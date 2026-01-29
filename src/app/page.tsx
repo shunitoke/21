@@ -1,13 +1,22 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Home as HomeIcon, LineChart, Loader2, Plus, Settings, Sparkles } from "lucide-react";
 import HomeScreen from "@/components/screens/HomeScreen";
-import ProgressScreen from "@/components/screens/ProgressScreen";
-import PracticeScreen from "@/components/screens/PracticeScreen";
-import SettingsScreen from "@/components/screens/SettingsScreen";
+const ProgressScreen = dynamic(() => import("@/components/screens/ProgressScreen"), {
+  ssr: false,
+  loading: () => <div className="h-[260px] w-full animate-pulse rounded-3xl bg-muted/50" />,
+});
+const PracticeScreen = dynamic(() => import("@/components/screens/PracticeScreen"), {
+  ssr: false,
+  loading: () => <div className="h-[260px] w-full animate-pulse rounded-3xl bg-muted/50" />,
+});
+const SettingsScreen = dynamic(() => import("@/components/screens/SettingsScreen"), {
+  ssr: false,
+});
 import HabitModal from "@/components/HabitModal";
 import type { Habit, HabitCategoryId, JournalEntry, Locale, StopCraneItem, ThemePreference } from "@/lib/types";
 import { t } from "@/lib/i18n";

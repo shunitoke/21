@@ -64,6 +64,49 @@ const usePageVisibility = () => {
   return isVisible;
 };
 
+const useIdleRender = (enabled = true, delay = 300) => {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) {
+      setReady(false);
+      return;
+    }
+
+    const requestIdle =
+      typeof window !== "undefined"
+        ? (window as Window & {
+            requestIdleCallback?: (cb: IdleRequestCallback, options?: IdleRequestOptions) => number;
+            cancelIdleCallback?: (handle: number) => void;
+          }).requestIdleCallback
+        : undefined;
+    const cancelIdle =
+      typeof window !== "undefined"
+        ? (window as Window & {
+            cancelIdleCallback?: (handle: number) => void;
+          }).cancelIdleCallback
+        : undefined;
+
+    let handle: number | null = null;
+    if (requestIdle) {
+      handle = requestIdle(() => setReady(true), { timeout: 700 });
+    } else {
+      handle = window.setTimeout(() => setReady(true), delay);
+    }
+
+    return () => {
+      if (handle === null) return;
+      if (requestIdle && cancelIdle) {
+        cancelIdle(handle);
+      } else {
+        clearTimeout(handle);
+      }
+    };
+  }, [enabled, delay]);
+
+  return ready;
+};
+
 const useCountUp = (value: number, duration = 900, enabled = true) => {
   const [displayValue, setDisplayValue] = useState(0);
   const latestValueRef = useRef(0);
@@ -234,6 +277,7 @@ const renderJournalIcon = (cx: number, cy: number, entries: JournalEntry[], onCl
 
 const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive = true }: ProgressScreenProps) => {
   const isPageVisible = usePageVisibility();
+  const isChartReady = useIdleRender(isActive);
   const [chartMode, setChartMode] = useState<"week" | "month" | "year">("week");
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [showJournalEntries, setShowJournalEntries] = useState(true);
@@ -1281,30 +1325,34 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
               </Button>
             </div>
             <div className="overflow-hidden" style={{ touchAction: 'pan-y' }}>
-              <ChartContainer config={chartConfig} className="h-[200px] w-full" style={{ touchAction: 'pan-y' }}>
-                <ComposedChart data={chartDataWithHandlers} margin={{ top: 28, left: 12, right: 12, bottom: 6 }}>
-                  <CartesianGrid vertical={false} />
-                  <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
-                  <YAxis hide domain={[0, (dataMax: number) => Math.max(1, dataMax + 3)]} />
-                  <ChartTooltip cursor={false} content={renderDynamicsTooltip} />
-                  {chartSeriesIds.map((seriesId) => (
-                    <Area
-                      key={seriesId}
-                      dataKey={seriesId}
-                      type="monotone"
-                      fill={`var(--color-${seriesId})`}
-                      fillOpacity={chartSeriesIds.length > 1 ? 0.08 : 0.25}
-                      stroke={`var(--color-${seriesId})`}
-                      strokeWidth={2}
-                      dot={getDotRenderer(seriesId)}
-                      activeDot={getDotRenderer(seriesId)}
-                      isAnimationActive
-                      animationBegin={0}
-                      animationDuration={650}
-                    />
-                  ))}
-                </ComposedChart>
-              </ChartContainer>
+              {isChartReady ? (
+                <ChartContainer config={chartConfig} className="h-[200px] w-full" style={{ touchAction: 'pan-y' }}>
+                  <ComposedChart data={chartDataWithHandlers} margin={{ top: 28, left: 12, right: 12, bottom: 6 }}>
+                    <CartesianGrid vertical={false} />
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+                    <YAxis hide domain={[0, (dataMax: number) => Math.max(1, dataMax + 3)]} />
+                    <ChartTooltip cursor={false} content={renderDynamicsTooltip} />
+                    {chartSeriesIds.map((seriesId) => (
+                      <Area
+                        key={seriesId}
+                        dataKey={seriesId}
+                        type="monotone"
+                        fill={`var(--color-${seriesId})`}
+                        fillOpacity={chartSeriesIds.length > 1 ? 0.08 : 0.25}
+                        stroke={`var(--color-${seriesId})`}
+                        strokeWidth={2}
+                        dot={getDotRenderer(seriesId)}
+                        activeDot={getDotRenderer(seriesId)}
+                        isAnimationActive
+                        animationBegin={0}
+                        animationDuration={650}
+                      />
+                    ))}
+                  </ComposedChart>
+                </ChartContainer>
+              ) : (
+                <Skeleton className="h-[200px] w-full" />
+              )}
             </div>
           </div>
 
@@ -1330,17 +1378,21 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
                         className="relative overflow-hidden"
                         style={{ maxWidth: "96px", overflowX: "hidden", minWidth: "96px", width: "96px" }}
                       >
-                        <ChartContainer
-                          config={chartConfig}
-                          className="aspect-square w-[96px]"
-                          style={{ maxWidth: "96px", overflowX: "hidden", minWidth: "96px", width: "96px", touchAction: 'pan-y' }}
-                        >
-                          <RadialBarChart data={rhythmChartData} innerRadius={34} outerRadius={44} startAngle={90} endAngle={-270}>
-                            <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-                            <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel nameKey="rhythm" />} />
-                            <RadialBar dataKey="value" background cornerRadius={8} />
-                          </RadialBarChart>
-                        </ChartContainer>
+                        {isChartReady ? (
+                          <ChartContainer
+                            config={chartConfig}
+                            className="aspect-square w-[96px]"
+                            style={{ maxWidth: "96px", overflowX: "hidden", minWidth: "96px", width: "96px", touchAction: 'pan-y' }}
+                          >
+                            <RadialBarChart data={rhythmChartData} innerRadius={34} outerRadius={44} startAngle={90} endAngle={-270}>
+                              <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+                              <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel nameKey="rhythm" />} />
+                              <RadialBar dataKey="value" background cornerRadius={8} />
+                            </RadialBarChart>
+                          </ChartContainer>
+                        ) : (
+                          <Skeleton className="h-[96px] w-[96px]" />
+                        )}
                         <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-semibold text-foreground">
                           <CountUpValue key={`rhythm-${metricsAnimationKey}`} value={completionRate} suffix="%" enabled={metricAnimationEnabled} />
                         </span>
