@@ -6,6 +6,7 @@ import { Check, Flame, Plus, Star, Tag } from "lucide-react";
 import type { Habit, HabitLog, Locale } from "@/lib/types";
 import { t } from "@/lib/i18n";
 import { getTodayISO } from "@/lib/date";
+import { getDisciplineStreakWeeks } from "@/utils/habitUtils";
 import { getCategoryMeta } from "@/lib/categories";
 import Heatmap from "@/components/Heatmap";
 import { Button } from "@/components/ui/button";
@@ -23,22 +24,13 @@ interface HomeScreenProps {
   onReorderHabits: (orderedIds: string[]) => void;
 }
 
-const getCurrentStreak = (dates: string[], today: string) => {
-  if (!dates.length) return 0;
-  const unique = Array.from(new Set(dates)).sort();
-  let streak = 0;
-  let cursor = new Date(today);
-  for (let i = unique.length - 1; i >= 0; i -= 1) {
-    const current = new Date(unique[i]);
-    const diff = (cursor.getTime() - current.getTime()) / (1000 * 60 * 60 * 24);
-    if (diff === 0 || diff === 1) {
-      streak += 1;
-      cursor = current;
-    } else {
-      break;
-    }
-  }
-  return streak;
+const getFlameCount = (weeks: number) => {
+  if (weeks >= 24) return 5;
+  if (weeks >= 12) return 4;
+  if (weeks >= 8) return 3;
+  if (weeks >= 4) return 2;
+  if (weeks >= 1) return 1;
+  return 0;
 };
 
 const getShakeClass = (shake?: "step" | "complete" | "reset" | null) => {
@@ -368,9 +360,8 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
           const count = Math.min(target, log?.count ?? 0);
           const progress = target ? count / target : 0;
           const done = progress >= 1;
-          const doneDates = habitLogs.filter((entry) => entry.status === "done").map((entry) => entry.date);
-          const streakCount = getCurrentStreak(doneDates, today);
-          const streakFlames = Math.min(5, streakCount);
+          const streakWeeks = getDisciplineStreakWeeks(habitLogs, habit.id, today);
+          const streakFlames = getFlameCount(streakWeeks);
           const Icon = habit.category ? getCategoryMeta(habit.category).icon : Tag;
           const shake = shakeMap[habit.id];
           const shakeClass = getShakeClass(shake);

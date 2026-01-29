@@ -73,3 +73,46 @@ export const calculateStreakProgress = (
 
   return { prevStreak, nextStreak, goalReached };
 };
+
+const getWeekStartISO = (dateISO: string) => {
+  const date = new Date(`${dateISO}T00:00:00Z`);
+  const day = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - day);
+  date.setUTCHours(0, 0, 0, 0);
+  return date.toISOString().slice(0, 10);
+};
+
+export const getDisciplineStreakWeeks = (
+  logs: HabitLog[],
+  habitId: string,
+  today: string
+) => {
+  const required = 5;
+  const weekCounts = new Map<string, number>();
+
+  logs
+    .filter((log) => log.habitId === habitId && log.status === "done")
+    .forEach((log) => {
+      const weekKey = getWeekStartISO(log.date);
+      weekCounts.set(weekKey, (weekCounts.get(weekKey) ?? 0) + 1);
+    });
+
+  let streak = 0;
+  const currentWeekKey = getWeekStartISO(today);
+  let cursor = new Date(`${currentWeekKey}T00:00:00Z`);
+  while (true) {
+    const key = cursor.toISOString().slice(0, 10);
+    const count = weekCounts.get(key) ?? 0;
+    if (count < required) {
+      if (key === currentWeekKey) {
+        cursor.setUTCDate(cursor.getUTCDate() - 7);
+        continue;
+      }
+      break;
+    }
+    streak += 1;
+    cursor.setUTCDate(cursor.getUTCDate() - 7);
+  }
+
+  return streak;
+};
