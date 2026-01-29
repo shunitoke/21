@@ -196,7 +196,7 @@ const phaseDescriptions: Record<BreathingPhase, { ru: string; en: string }> = {
   exhale: { ru: "Мягко выпускайте воздух", en: "Gently release the air" },
 };
 
-const breathingDots = Array.from({ length: 10 }, (_, index) => index);
+const breathingDots = Array.from({ length: 6 }, (_, index) => index);
 
 const usePageVisibility = () => {
   const [isVisible, setIsVisible] = useState(() => (typeof document === "undefined" ? true : !document.hidden));
@@ -261,6 +261,7 @@ const PracticeScreen = ({
   const anchorGridRef = useRef<HTMLDivElement | null>(null);
   const dragBlockRef = useRef(false);
   const dragTimeoutRef = useRef<number | null>(null);
+  const anchorHoldTimeoutRef = useRef<number | null>(null);
   const lastSwapIndexRef = useRef<number | null>(null);
   const imageViewportRef = useRef<HTMLDivElement | null>(null);
   const imagePointersRef = useRef(new Map<number, { x: number; y: number }>());
@@ -338,6 +339,7 @@ const PracticeScreen = ({
   useEffect(() => {
     return () => {
       if (dragTimeoutRef.current) window.clearTimeout(dragTimeoutRef.current);
+      if (anchorHoldTimeoutRef.current) window.clearTimeout(anchorHoldTimeoutRef.current);
     };
   }, []);
 
@@ -548,14 +550,26 @@ const PracticeScreen = ({
         }}
       >
         <Card className="transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0">
-          <CardContent className="grid gap-3">
+          <CardContent className="grid gap-3 px-3">
             <div className="flex items-center justify-between">
               <button
                 type="button"
                 className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground"
                 onPointerDown={(event) => {
                   event.stopPropagation();
-                  dragControls.start(event);
+                  if (anchorHoldTimeoutRef.current) window.clearTimeout(anchorHoldTimeoutRef.current);
+                  anchorHoldTimeoutRef.current = window.setTimeout(() => {
+                    dragControls.start(event);
+                  }, 180);
+                }}
+                onPointerUp={() => {
+                  if (anchorHoldTimeoutRef.current) window.clearTimeout(anchorHoldTimeoutRef.current);
+                }}
+                onPointerLeave={() => {
+                  if (anchorHoldTimeoutRef.current) window.clearTimeout(anchorHoldTimeoutRef.current);
+                }}
+                onPointerCancel={() => {
+                  if (anchorHoldTimeoutRef.current) window.clearTimeout(anchorHoldTimeoutRef.current);
                 }}
                 aria-label={t("drag", locale)}
               >
@@ -653,7 +667,7 @@ const PracticeScreen = ({
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="pb-0">
+        <CardContent className="px-3 pb-0 sm:px-6">
           {orderedStopCrane.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("pinAnchorsEmpty", locale)}</p>
           ) : (
@@ -981,7 +995,8 @@ const PracticeScreen = ({
             </div>
             <div className="relative z-0 flex flex-1 flex-col items-center justify-center">
               <motion.div
-                className="relative grid place-items-center"
+                className="relative grid place-items-center transform-gpu"
+                style={{ willChange: "transform" }}
                 animate={{
                   scale: breathingPhase === "inhale" ? 1.18 : breathingPhase === "exhale" ? 0.82 : 1.02,
                 }}
@@ -991,7 +1006,6 @@ const PracticeScreen = ({
                   className={`absolute size-[240px] rounded-full ${isDarkTheme ? "bg-[#2f7bff]" : "bg-[#f3e7db]"}`}
                   style={{
                     opacity: isDarkTheme ? 0.45 * cycleBrightness : 1,
-                    transition: "opacity 1.6s ease",
                   }}
                 />
                 {breathingDots.map((index) => (
@@ -1000,8 +1014,7 @@ const PracticeScreen = ({
                     className={`absolute size-[240px] rounded-full ${isDarkTheme ? "bg-[#5aa8ff]" : "bg-[#f7ede2]"}`}
                     style={{
                       opacity: (isDarkTheme ? 0.25 : 0.35) * cycleBrightness,
-                      transform: `rotate(${index * 18}deg)`,
-                      transition: "opacity 1.6s ease",
+                      transform: `rotate(${index * 30}deg)`,
                     }}
                   />
                 ))}
@@ -1009,14 +1022,12 @@ const PracticeScreen = ({
                   className={`absolute size-[180px] rounded-full ${isDarkTheme ? "bg-[#7cc6ff]" : "bg-[#f1d7c2]/70"}`}
                   style={{
                     opacity: isDarkTheme ? 0.45 * cycleBrightness : 1,
-                    transition: "opacity 1.6s ease",
                   }}
                 />
                 <div
                   className={`absolute size-[120px] rounded-full ${isDarkTheme ? "bg-[#c0e4ff]" : "bg-[#f0c8aa]/65"}`}
                   style={{
                     opacity: isDarkTheme ? 0.5 * cycleBrightness : 1,
-                    transition: "opacity 1.6s ease",
                   }}
                 />
               </motion.div>

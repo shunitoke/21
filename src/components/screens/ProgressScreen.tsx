@@ -1317,22 +1317,25 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
           </DialogHeader>
           <div className="mt-2 grid gap-3">
             {selectedEntries?.map((entry) => (
-              <Card key={entry.id} className="p-4">
+              <Card
+                key={entry.id}
+                className="p-4 transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
+              >
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">
                   {new Date(entry.date).toLocaleDateString()}
                 </p>
                 {entry.type === "audio" ? (
-                  <div className="mt-2">
+                  <div className="mt-3">
                     <AudioAnchor src={entry.content} locale={locale} />
                     {entry.textContent && (
-                      <p className="mt-2 text-sm leading-snug break-words">{entry.textContent}</p>
+                      <p className="mt-3 text-sm leading-snug break-words">{entry.textContent}</p>
                     )}
                   </div>
                 ) : (
-                  <p className="mt-2 text-sm leading-snug break-words">{entry.content}</p>
+                  <p className="mt-3 text-sm leading-snug break-words">{entry.content}</p>
                 )}
                 {entry.emotions?.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-5 flex flex-wrap gap-2">
                     {entry.emotions.map((emotion) => {
                       const label = emotionLabels[emotion] ?? { ru: emotion, en: emotion };
                       return (

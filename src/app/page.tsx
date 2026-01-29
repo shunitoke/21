@@ -487,6 +487,7 @@ export default function Home() {
           initial="enter"
           animate="center"
           exit="exit"
+          className="w-full"
           transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
           drag={background.screen === "home" || background.screen === "progress" || background.screen === "practice" ? "x" : false}
           dragConstraints={{ left: 0, right: 0 }}
