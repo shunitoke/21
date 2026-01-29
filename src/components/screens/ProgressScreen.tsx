@@ -604,13 +604,19 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
   );
   const [quoteIndex, setQuoteIndex] = useState(0);
 
+
   useEffect(() => {
-    if (!isPageVisible) return;
-    const interval = setInterval(() => {
+    if (document.querySelector('[data-slot="dialog-overlay"], [data-slot="alert-dialog-overlay"]')) return;
+    setQuoteIndex((prev) => (quotes.length ? (prev + 1) % quotes.length : 0));
+  }, [quotes.length]);
+
+  useEffect(() => {
+    if (!isPageVisible) return undefined;
+    const interval = window.setInterval(() => {
       if (document.querySelector('[data-slot="dialog-overlay"], [data-slot="alert-dialog-overlay"]')) return;
       setQuoteIndex((prev) => (quotes.length ? (prev + 1) % quotes.length : 0));
     }, 15000);
-    return () => clearInterval(interval);
+    return () => window.clearInterval(interval);
   }, [isPageVisible, quotes.length]);
 
   const quote = quotes[quoteIndex] ?? quotes[0];
