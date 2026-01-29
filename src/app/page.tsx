@@ -419,7 +419,7 @@ export default function Home() {
   return (
     <div
       className="app-root min-h-[100svh] w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-6 text-foreground"
-      style={{ maxWidth: '100vw', overflowX: 'hidden' }}
+      style={{ maxWidth: '100vw', overflowX: 'hidden', touchAction: 'pan-y' }}
       onPointerDownCapture={(event) => {
         if (hasDialogOverlay) return;
         didSwipeRef.current = false;
