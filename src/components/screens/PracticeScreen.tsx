@@ -503,7 +503,7 @@ const PracticeScreen = ({
     const wobbleIndex = orderedStopCrane.findIndex((anchor) => anchor.id === item.id);
     const holdTimeoutRef = useRef<number | null>(null);
     const pressPointRef = useRef<{ x: number; y: number } | null>(null);
-    const pointerEventRef = useRef<React.PointerEvent<HTMLDivElement> | null>(null);
+    const pointerEventRef = useRef<PointerEvent | null>(null);
 
     const clearHoldTimeout = () => {
       if (holdTimeoutRef.current) {
@@ -515,7 +515,8 @@ const PracticeScreen = ({
     const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
       clearHoldTimeout();
       pressPointRef.current = { x: event.clientX, y: event.clientY };
-      pointerEventRef.current = event;
+      pointerEventRef.current = event.nativeEvent;
+      event.currentTarget.setPointerCapture(event.pointerId);
       holdTimeoutRef.current = window.setTimeout(() => {
         if (pointerEventRef.current) {
           dragControls.start(pointerEventRef.current);

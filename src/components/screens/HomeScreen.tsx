@@ -1,7 +1,7 @@
 "use client";
 
 import { Reorder, useDragControls } from "framer-motion";
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type React } from "react";
 import { Check, Flame, Plus, Star, Tag } from "lucide-react";
 import type { Habit, HabitLog, Locale } from "@/lib/types";
 import { t } from "@/lib/i18n";
@@ -155,7 +155,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
     const dragControls = useDragControls();
     const holdTimeoutRef = useRef<number | null>(null);
     const pressPointRef = useRef<{ x: number; y: number } | null>(null);
-    const pointerEventRef = useRef<PointerEvent<HTMLLIElement> | null>(null);
+    const pointerEventRef = useRef<globalThis.PointerEvent | null>(null);
 
     const clearHoldTimeout = () => {
       if (holdTimeoutRef.current) {
@@ -164,10 +164,11 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
       }
     };
 
-    const handlePointerDown = (event: PointerEvent<HTMLLIElement>) => {
+    const handlePointerDown = (event: React.PointerEvent<HTMLLIElement>) => {
       clearHoldTimeout();
       pressPointRef.current = { x: event.clientX, y: event.clientY };
-      pointerEventRef.current = event;
+      pointerEventRef.current = event.nativeEvent as globalThis.PointerEvent;
+      event.currentTarget.setPointerCapture(event.pointerId);
       holdTimeoutRef.current = window.setTimeout(() => {
         if (pointerEventRef.current) {
           dragControls.start(pointerEventRef.current);
@@ -175,7 +176,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
       }, 180);
     };
 
-    const handlePointerMove = (event: PointerEvent<HTMLLIElement>) => {
+    const handlePointerMove = (event: React.PointerEvent<HTMLLIElement>) => {
       if (!pressPointRef.current) return;
       const dx = Math.abs(event.clientX - pressPointRef.current.x);
       const dy = Math.abs(event.clientY - pressPointRef.current.y);
