@@ -1150,16 +1150,6 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              <CarouselPrevious
-                size="icon-sm"
-                variant="secondary"
-                className="left-2 top-1/2 -translate-y-1/2"
-              />
-              <CarouselNext
-                size="icon-sm"
-                variant="secondary"
-                className="right-2 top-1/2 -translate-y-1/2"
-              />
             </Carousel>
           ) : (
             <Carousel
@@ -1214,16 +1204,6 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              <CarouselPrevious
-                size="icon-sm"
-                variant="secondary"
-                className="left-2 top-1/2 -translate-y-1/2"
-              />
-              <CarouselNext
-                size="icon-sm"
-                variant="secondary"
-                className="right-2 top-1/2 -translate-y-1/2"
-              />
             </Carousel>
           )}
 
