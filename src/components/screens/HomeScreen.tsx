@@ -1,7 +1,7 @@
 "use client";
 
 import { Reorder, useDragControls } from "framer-motion";
-import { useEffect, useMemo, useRef, useState, type React } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { Check, Flame, Plus, Star, Tag } from "lucide-react";
 import type { Habit, HabitLog, Locale } from "@/lib/types";
 import { t } from "@/lib/i18n";
@@ -164,7 +164,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
       }
     };
 
-    const handlePointerDown = (event: React.PointerEvent<HTMLLIElement>) => {
+    const handlePointerDown = (event: PointerEvent<HTMLLIElement>) => {
       clearHoldTimeout();
       pressPointRef.current = { x: event.clientX, y: event.clientY };
       pointerEventRef.current = event.nativeEvent as globalThis.PointerEvent;
@@ -176,7 +176,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
       }, 180);
     };
 
-    const handlePointerMove = (event: React.PointerEvent<HTMLLIElement>) => {
+    const handlePointerMove = (event: PointerEvent<HTMLLIElement>) => {
       if (!pressPointRef.current) return;
       const dx = Math.abs(event.clientX - pressPointRef.current.x);
       const dy = Math.abs(event.clientY - pressPointRef.current.y);
