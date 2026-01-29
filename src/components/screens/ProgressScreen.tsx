@@ -1163,7 +1163,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
               variant="outline"
               size="sm"
               spacing={0}
-              className="flex max-w-full flex-wrap"
+              className="flex w-full max-w-full flex-wrap overflow-hidden"
             >
               <ToggleGroupItem value="week" size="sm">
                 {t("periodWeek", locale)}
@@ -1176,7 +1176,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
-          <div className="mt-3 flex max-w-full flex-wrap gap-2">
+          <div className="mt-3 flex w-full max-w-full flex-wrap gap-2 overflow-hidden">
             <Button type="button" size="xs" variant={isAllCategories ? "default" : "outline"} onClick={() => setCategoryFilter([])}>
               {t("filterAll", locale)}
             </Button>
