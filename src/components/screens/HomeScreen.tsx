@@ -156,6 +156,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
     const holdTimeoutRef = useRef<number | null>(null);
     const pressPointRef = useRef<{ x: number; y: number } | null>(null);
     const pointerEventRef = useRef<globalThis.PointerEvent | null>(null);
+    const [dragActive, setDragActive] = useState(false);
 
     const clearHoldTimeout = () => {
       if (holdTimeoutRef.current) {
@@ -171,6 +172,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
       event.currentTarget.setPointerCapture(event.pointerId);
       holdTimeoutRef.current = window.setTimeout(() => {
         if (pointerEventRef.current) {
+          setDragActive(true);
           dragControls.start(pointerEventRef.current);
         }
       }, 180);
@@ -184,6 +186,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
         clearHoldTimeout();
         pressPointRef.current = null;
         pointerEventRef.current = null;
+        setDragActive(false);
       }
     };
 
@@ -191,6 +194,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
       clearHoldTimeout();
       pressPointRef.current = null;
       pointerEventRef.current = null;
+      setDragActive(false);
     };
 
     return (
@@ -204,7 +208,10 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
         dragListener={false}
         dragElastic={0.18}
         dragMomentum={false}
-        style={{ boxShadow: draggingHabitId === habit.id ? "0 18px 40px rgba(0,0,0,0.2)" : "none" }}
+        style={{
+          boxShadow: draggingHabitId === habit.id ? "0 18px 40px rgba(0,0,0,0.2)" : "none",
+          touchAction: dragActive ? "none" : "pan-y",
+        }}
         initial={{ opacity: 0.25, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{
@@ -229,6 +236,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
           blockClick();
           vibrationFeedback.dropSuccess();
           setDraggingHabitId(null);
+          setDragActive(false);
           commitOrder(pendingOrderRef.current);
         }}
         onClick={() => {

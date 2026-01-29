@@ -25,8 +25,19 @@ const Heatmap = ({
 }: HeatmapProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [maxColumns, setMaxColumns] = useState<number | null>(null);
-  const cellSize = 10;
-  const cellGap = 2;
+  const [cellSize, setCellSize] = useState(10);
+  const [cellGap, setCellGap] = useState(2);
+
+  useLayoutEffect(() => {
+    const updateSizes = () => {
+      const isCompact = window.matchMedia("(max-width: 640px)").matches;
+      setCellSize(isCompact ? 8 : 10);
+      setCellGap(isCompact ? 1 : 2);
+    };
+    updateSizes();
+    window.addEventListener("resize", updateSizes);
+    return () => window.removeEventListener("resize", updateSizes);
+  }, []);
 
   useLayoutEffect(() => {
     if (!containerRef.current) return;
@@ -42,7 +53,7 @@ const Heatmap = ({
     const observer = new ResizeObserver(updateColumns);
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, []);
+  }, [cellGap, cellSize]);
 
   const logMap = useMemo(() => {
     const map = new Map<string, HabitLog>();

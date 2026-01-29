@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useDragControls } from "framer-motion";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ChevronDown, ChevronUp, Filter, GripVertical, Moon, Pause, Play, Sun, Trash2, X } from "lucide-react";
 import type { JournalEntry, Locale, StopCraneItem } from "@/lib/types";
 import { t } from "@/lib/i18n";
@@ -435,7 +435,7 @@ const PracticeScreen = ({
     };
   };
 
-  const handleImagePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handleImagePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
     (event.currentTarget as HTMLDivElement).setPointerCapture(event.pointerId);
@@ -451,7 +451,7 @@ const PracticeScreen = ({
     }
   };
 
-  const handleImagePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handleImagePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!imagePreview) return;
     if (!imagePointersRef.current.has(event.pointerId)) return;
     imagePointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -471,7 +471,7 @@ const PracticeScreen = ({
     }
   };
 
-  const handleImagePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handleImagePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
     imagePointersRef.current.delete(event.pointerId);
     if (imagePointersRef.current.size < 2) imagePinchRef.current = null;
     if (imagePointersRef.current.size === 0) imagePanRef.current = null;
@@ -503,7 +503,8 @@ const PracticeScreen = ({
     const wobbleIndex = orderedStopCrane.findIndex((anchor) => anchor.id === item.id);
     const holdTimeoutRef = useRef<number | null>(null);
     const pressPointRef = useRef<{ x: number; y: number } | null>(null);
-    const pointerEventRef = useRef<PointerEvent | null>(null);
+    const pointerEventRef = useRef<globalThis.PointerEvent | null>(null);
+    const [dragActive, setDragActive] = useState(false);
 
     const clearHoldTimeout = () => {
       if (holdTimeoutRef.current) {
@@ -512,19 +513,20 @@ const PracticeScreen = ({
       }
     };
 
-    const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
       clearHoldTimeout();
       pressPointRef.current = { x: event.clientX, y: event.clientY };
-      pointerEventRef.current = event.nativeEvent;
+      pointerEventRef.current = event.nativeEvent as globalThis.PointerEvent;
       event.currentTarget.setPointerCapture(event.pointerId);
       holdTimeoutRef.current = window.setTimeout(() => {
         if (pointerEventRef.current) {
+          setDragActive(true);
           dragControls.start(pointerEventRef.current);
         }
       }, 180);
     };
 
-    const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
       if (!pressPointRef.current) return;
       const dx = Math.abs(event.clientX - pressPointRef.current.x);
       const dy = Math.abs(event.clientY - pressPointRef.current.y);
@@ -532,6 +534,7 @@ const PracticeScreen = ({
         clearHoldTimeout();
         pressPointRef.current = null;
         pointerEventRef.current = null;
+        setDragActive(false);
       }
     };
 
@@ -539,6 +542,7 @@ const PracticeScreen = ({
       clearHoldTimeout();
       pressPointRef.current = null;
       pointerEventRef.current = null;
+      setDragActive(false);
     };
 
     return (
@@ -554,8 +558,12 @@ const PracticeScreen = ({
         dragSnapToOrigin
         style={
           anchorWobbleActive
-            ? { touchAction: "auto", width: "100%", animationDelay: `${Math.max(0, wobbleIndex) * 60}ms` }
-            : { touchAction: "auto", width: "100%" }
+            ? {
+                touchAction: dragActive ? "none" : "pan-y",
+                width: "100%",
+                animationDelay: `${Math.max(0, wobbleIndex) * 60}ms`,
+              }
+            : { touchAction: dragActive ? "none" : "pan-y", width: "100%" }
         }
         whileDrag={{ scale: 1.03, boxShadow: "0 16px 38px rgba(0,0,0,0.22)", cursor: "grabbing", zIndex: 20 }}
         transition={{ type: "spring", stiffness: 540, damping: 38 }}
@@ -584,6 +592,7 @@ const PracticeScreen = ({
         onDragEnd={(_, info) => {
           blockClick();
           vibrationFeedback.dropSuccess();
+          setDragActive(false);
           const currentIndex = orderedStopCrane.findIndex((anchor) => anchor.id === item.id);
           const targetIndex = currentIndex === -1 ? -1 : getSwapIndex(currentIndex, info.offset);
           if (currentIndex !== -1 && targetIndex !== currentIndex) {
