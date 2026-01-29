@@ -276,6 +276,47 @@ html {
   html {
     font-size: 14px;
   }
+
+  .app-root {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  [data-slot="card"] {
+    padding-top: 16px;
+    padding-bottom: 16px;
+    gap: 16px;
+  }
+
+  [data-slot="card-header"],
+  [data-slot="card-content"],
+  [data-slot="card-footer"] {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  [data-slot="card-header"] {
+    padding-bottom: 16px;
+  }
+
+  [data-slot="button"][data-size="default"] {
+    height: 34px;
+    padding-left: 12px;
+    padding-right: 12px;
+    font-size: 0.9rem;
+  }
+
+  [data-slot="button"][data-size="sm"] {
+    height: 30px;
+    padding-left: 10px;
+    padding-right: 10px;
+    font-size: 0.85rem;
+  }
+
+  [data-slot="button"][data-size="icon"] {
+    width: 34px;
+    height: 34px;
+  }
 }
 
 body:has([data-slot="dialog-overlay"]) {
