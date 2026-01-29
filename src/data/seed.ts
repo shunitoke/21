@@ -8,7 +8,7 @@ export const defaultSettings: UserSettings = {
   locale: detectSystemLocale(),
   theme: "system",
   ally: "friend",
-  demoMode: false,
+  demoMode: true,
 };
 
 export const demoSettings: UserSettings = {

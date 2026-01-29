@@ -31,7 +31,7 @@ const getDefaultSettings = () => ({
   locale: detectSystemLocale(),
   theme: "system" as const,
   ally: "friend" as const,
-  demoMode: false,
+  demoMode: true,
 });
 
 const persistState = (
