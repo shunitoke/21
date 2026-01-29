@@ -202,7 +202,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
         className={`grid cursor-grab gap-4 ${shakeClass}`}
         key={habit.id}
         value={habit}
-        layout
+        layout="position"
         drag
         dragControls={dragControls}
         dragListener={false}
@@ -212,13 +212,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
           boxShadow: draggingHabitId === habit.id ? "0 18px 40px rgba(0,0,0,0.2)" : "none",
           touchAction: dragActive ? "none" : "pan-y",
         }}
-        initial={{ opacity: 0.25, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
         transition={{
-          type: "spring",
-          stiffness: 260,
-          damping: 28,
-          delay,
           layout: { type: "spring", stiffness: 520, damping: 38 },
         }}
         whileDrag={{ scale: 1.02, cursor: "grabbing" }}

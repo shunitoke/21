@@ -16,7 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Carousel, type CarouselApi, CarouselContent, CarouselItem } from "@/components/ui/carousel";
+import { Carousel, type CarouselApi, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { TooltipProps } from "recharts";
 import { Area, CartesianGrid, ComposedChart, PolarAngleAxis, RadialBar, RadialBarChart, XAxis, YAxis } from "recharts";
 import { NotebookPen, TrendingDown, TrendingUp } from "lucide-react";
@@ -238,7 +240,12 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
   const [selectedEntries, setSelectedEntries] = useState<JournalEntry[] | null>(null);
   const [showAllAchievements, setShowAllAchievements] = useState(false);
   const [metricsCarouselApi, setMetricsCarouselApi] = useState<CarouselApi | null>(null);
+  const [isCompact, setIsCompact] = useState(false);
   const journalDialogFocusRef = useRef<HTMLDivElement | null>(null);
+  const metricsAnimationKeyRef = useRef(0);
+  const [metricsAnimationKey, setMetricsAnimationKey] = useState(0);
+  const prevActiveRef = useRef(isActive);
+  const prevVisibleRef = useRef(isPageVisible);
   const chartDataRef = useRef<ChartPoint[]>([]);
 
   const journalByDate = useMemo(() => {
@@ -688,6 +695,15 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
   }, [metrics]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 640px)");
+    const handleChange = () => setIsCompact(media.matches);
+    handleChange();
+    media.addEventListener?.("change", handleChange);
+    return () => media.removeEventListener?.("change", handleChange);
+  }, []);
+
+  useEffect(() => {
     const api = metricsCarouselApi;
     if (!api || !isPageVisible) return;
 
@@ -699,6 +715,17 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
 
     return () => window.clearInterval(interval);
   }, [isPageVisible, metricsCarouselApi]);
+
+  useEffect(() => {
+    const becameActive = isActive && !prevActiveRef.current;
+    const becameVisible = isPageVisible && !prevVisibleRef.current;
+    if (becameActive || becameVisible) {
+      metricsAnimationKeyRef.current += 1;
+      setMetricsAnimationKey(metricsAnimationKeyRef.current);
+    }
+    prevActiveRef.current = isActive;
+    prevVisibleRef.current = isPageVisible;
+  }, [isActive, isPageVisible]);
 
   const chartSeriesIds = useMemo(() => (isAllCategories ? ["all"] : activeCategoryIds), [activeCategoryIds, isAllCategories]);
 
@@ -1063,216 +1090,305 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
     return bucket;
   }, [achievementGroupOrder, getAchievementGroup, groupedAchievements, showAllAchievements, visibleGroupedAchievements]);
 
+  const showMetricSkeleton = habits.length === 0 && logs.length === 0;
+  const metricAnimationEnabled = isPageVisible && isActive;
+
   return (
-    <div className="grid gap-4 max-w-full overflow-x-hidden">
-      <Carousel
-        opts={{ align: "start", loop: true }}
-        setApi={setMetricsCarouselApi}
-        className="relative max-w-full overflow-hidden"
-      >
-        <CarouselContent className="max-w-full">
-          {carouselMetrics.map((metric, index) => (
-            <CarouselItem key={`${metric.title}-${index}`} className="basis-full sm:basis-1/2 lg:basis-1/3">
-              <div className="h-full p-1">
-                <motion.div custom={index} variants={metricCardVariants} initial="hidden" animate="show" className="h-full">
-                  <Card className="h-full drop-shadow-sm">
-                  <CardHeader>
-                    <CardDescription className="text-xs uppercase tracking-wide">{metric.title}</CardDescription>
-                    <CardTitle className="text-2xl font-semibold tabular-nums sm:text-3xl">
-                      {typeof metric.value === "number" ? <CountUpValue value={metric.value} enabled={isPageVisible} /> : metric.value}
-                    </CardTitle>
-                    <CardAction className="self-start">
-                      <Badge variant="outline" className="gap-1 text-[10px]">
-                        {metric.badgeDirection === "down" ? <TrendingDown className="size-3.5" /> : <TrendingUp className="size-3.5" />}
-                        {metric.badge}
-                      </Badge>
-                    </CardAction>
-                  </CardHeader>
-                  <CardFooter className="flex-col items-start gap-1 text-xs">
-                    <div className="line-clamp-1 flex items-center gap-1.5 font-semibold">
-                      {metric.badgeDirection === "down"
-                        ? locale === "ru"
-                          ? "Нужно внимание"
-                          : "Needs attention"
-                        : locale === "ru"
-                          ? "Хороший темп"
-                          : "On a good pace"}
-                      {metric.badgeDirection === "down" ? <TrendingDown className="size-3.5" /> : <TrendingUp className="size-3.5" />}
+    <div className="grid gap-6 max-w-full overflow-x-hidden" style={{ maxWidth: '100vw', overflowX: 'hidden', width: '100%', minWidth: '0', flexShrink: '1', flexBasis: '0', boxSizing: 'border-box' }}>
+      <Card className="w-full max-w-full overflow-hidden">
+        <CardContent className="space-y-6">
+          {isCompact ? (
+            <Carousel
+              opts={{ align: "start", loop: true }}
+              setApi={setMetricsCarouselApi}
+              className="relative max-w-full overflow-hidden"
+            >
+              <CarouselContent className="max-w-full">
+                {carouselMetrics.map((metric, index) => (
+                  <CarouselItem key={`${metric.title}-${index}`} className="basis-full">
+                    <div className="h-full p-1">
+                      <motion.div custom={index} variants={metricCardVariants} initial="hidden" animate="show" className="h-full">
+                        <div className="h-full">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">{metric.title}</p>
+                              <Badge variant="outline" className="gap-1 text-[10px]">
+                                {metric.badgeDirection === "down" ? <TrendingDown className="size-3.5" /> : <TrendingUp className="size-3.5" />}
+                                {metric.badge}
+                              </Badge>
+                            </div>
+                            <div className="text-2xl font-semibold tabular-nums sm:text-3xl">
+                              {showMetricSkeleton ? (
+                                <Skeleton className="h-7 w-20" />
+                              ) : typeof metric.value === "number" ? (
+                                <CountUpValue key={`metric-${metric.id}-${metricsAnimationKey}`} value={metric.value} enabled={metricAnimationEnabled} />
+                              ) : (
+                                metric.value
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-start gap-1 text-xs">
+                            <div className="line-clamp-1 flex items-center gap-1.5 font-semibold">
+                              {metric.badgeDirection === "down"
+                                ? locale === "ru"
+                                  ? "Нужно внимание"
+                                  : "Needs attention"
+                                : locale === "ru"
+                                  ? "Хороший темп"
+                                  : "On a good pace"}
+                              {metric.badgeDirection === "down" ? <TrendingDown className="size-3.5" /> : <TrendingUp className="size-3.5" />}
+                            </div>
+                            {showMetricSkeleton ? (
+                              <Skeleton className="h-3 w-28" />
+                            ) : (
+                              <div className="line-clamp-1 text-muted-foreground">{metric.hint}</div>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
                     </div>
-                    <div className="text-muted-foreground line-clamp-1">{metric.hint}</div>
-                  </CardFooter>
-                  </Card>
-                </motion.div>
-              </div>
-            </CarouselItem>
-          ))}
-        </CarouselContent>
-      </Carousel>
-
-      <div className="grid grid-cols-3 items-stretch gap-2 sm:gap-3">
-        <motion.div custom={0} variants={metricCardVariants} initial="hidden" animate="show" className="h-full">
-          <Card className="h-full min-h-[104px] p-3 sm:p-4">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("totalDoneAll", locale)}</p>
-            <p className="mt-2 text-2xl font-semibold tabular-nums">
-              <CountUpValue value={totalDone} enabled={isPageVisible} />
-            </p>
-          </Card>
-        </motion.div>
-        <motion.div custom={1} variants={metricCardVariants} initial="hidden" animate="show" className="h-full">
-          <Card className="h-full min-h-[104px] p-3 sm:p-4">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("avgRhythm", locale)}</p>
-            <div className="mt-2 flex items-center justify-center">
-              <div className="relative">
-                <ChartContainer config={chartConfig} className="aspect-square w-[96px]">
-                  <RadialBarChart data={rhythmChartData} innerRadius={34} outerRadius={44} startAngle={90} endAngle={-270}>
-                    <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel nameKey="rhythm" />} />
-                    <RadialBar dataKey="value" background cornerRadius={8} />
-                  </RadialBarChart>
-                </ChartContainer>
-                <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-semibold text-foreground">
-                  <CountUpValue value={completionRate} suffix="%" enabled={isPageVisible} />
-                </span>
-              </div>
-
-              <span className="sr-only">{completionRate}%</span>
-            </div>
-          </Card>
-        </motion.div>
-        <motion.div custom={2} variants={metricCardVariants} initial="hidden" animate="show" className="h-full">
-          <Card className="h-full min-h-[104px] p-3 sm:p-4">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("activeHabits", locale)}</p>
-            <p className="mt-2 text-2xl font-semibold tabular-nums">
-              <CountUpValue value={filteredHabits.length} enabled={isPageVisible} />
-            </p>
-          </Card>
-        </motion.div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <div className="flex min-w-0 items-start justify-between gap-3">
-            <div>
-              <CardTitle className="text-base">{t("dynamics", locale)}</CardTitle>
-              <p className="text-xs text-muted-foreground">
-              {chartMode === "week"
-                ? t("periodWeek", locale)
-                : chartMode === "month"
-                  ? t("period30Days", locale)
-                  : t("periodYear", locale)}
-              </p>
-            </div>
-            <ToggleGroup
-              type="single"
-              value={chartMode}
-              onValueChange={(value) => value && setChartMode(value as "week" | "month" | "year")}
-              variant="outline"
-              size="sm"
-              spacing={0}
-              className="flex w-full max-w-full flex-wrap overflow-hidden"
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious
+                size="icon-sm"
+                variant="secondary"
+                className="left-2 top-1/2 -translate-y-1/2"
+              />
+              <CarouselNext
+                size="icon-sm"
+                variant="secondary"
+                className="right-2 top-1/2 -translate-y-1/2"
+              />
+            </Carousel>
+          ) : (
+            <Carousel
+              opts={{ align: "start", loop: true }}
+              setApi={setMetricsCarouselApi}
+              className="relative max-w-full overflow-hidden"
             >
-              <ToggleGroupItem value="week" size="sm">
-                {t("periodWeek", locale)}
-              </ToggleGroupItem>
-              <ToggleGroupItem value="month" size="sm">
-                {t("periodMonth", locale)}
-              </ToggleGroupItem>
-              <ToggleGroupItem value="year" size="sm">
-                {t("periodYear", locale)}
-              </ToggleGroupItem>
-            </ToggleGroup>
+              <CarouselContent className="max-w-full">
+                {carouselMetrics.map((metric, index) => (
+                  <CarouselItem key={`${metric.title}-${index}`} className="basis-full sm:basis-1/2 lg:basis-1/3">
+                    <div className="h-full p-1">
+                      <motion.div custom={index} variants={metricCardVariants} initial="hidden" animate="show" className="h-full">
+                        <div className="h-full rounded-xl bg-card text-card-foreground">
+                          <div className="space-y-2 p-4">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">{metric.title}</p>
+                              <Badge variant="outline" className="gap-1 text-[10px]">
+                                {metric.badgeDirection === "down" ? (
+                                  <TrendingDown className="size-3.5" />
+                                ) : (
+                                  <TrendingUp className="size-3.5" />
+                                )}
+                                {metric.badge}
+                              </Badge>
+                            </div>
+                            <div className="text-2xl font-semibold tabular-nums sm:text-3xl">
+                              {showMetricSkeleton ? (
+                                <Skeleton className="h-7 w-20" />
+                              ) : typeof metric.value === "number" ? (
+                                <CountUpValue key={`metric-${metric.id}-${metricsAnimationKey}`} value={metric.value} enabled={metricAnimationEnabled} />
+                              ) : (
+                                metric.value
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-start gap-1 px-4 pb-4 text-xs">
+                            <div className="line-clamp-1 flex items-center gap-1.5 font-semibold">
+                              {metric.badgeDirection === "down"
+                                ? locale === "ru"
+                                  ? "Нужно внимание"
+                                  : "Needs attention"
+                                : locale === "ru"
+                                  ? "Хороший темп"
+                                  : "On a good pace"}
+                              {metric.badgeDirection === "down" ? <TrendingDown className="size-3.5" /> : <TrendingUp className="size-3.5" />}
+                            </div>
+                            {showMetricSkeleton ? <Skeleton className="h-3 w-28" /> : <div className="line-clamp-1 text-muted-foreground">{metric.hint}</div>}
+                          </div>
+                        </div>
+                      </motion.div>
+                    </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious
+                size="icon-sm"
+                variant="secondary"
+                className="left-2 top-1/2 -translate-y-1/2"
+              />
+              <CarouselNext
+                size="icon-sm"
+                variant="secondary"
+                className="right-2 top-1/2 -translate-y-1/2"
+              />
+            </Carousel>
+          )}
+
+          <Separator className="my-3" />
+
+          <div className="space-y-4">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div>
+                <p className="text-base font-semibold">{t("dynamics", locale)}</p>
+                <p className="text-xs text-muted-foreground">
+                {chartMode === "week"
+                  ? t("periodWeek", locale)
+                  : chartMode === "month"
+                    ? t("period30Days", locale)
+                    : t("periodYear", locale)}
+                </p>
+              </div>
+              <ToggleGroup
+                type="single"
+                value={chartMode}
+                onValueChange={(value) => value && setChartMode(value as "week" | "month" | "year")}
+                variant="outline"
+                size="sm"
+                spacing={0}
+                className="flex w-full max-w-full flex-wrap overflow-hidden"
+              >
+                <ToggleGroupItem value="week" size="sm">
+                  {t("periodWeek", locale)}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="month" size="sm">
+                  {t("periodMonth", locale)}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="year" size="sm">
+                  {t("periodYear", locale)}
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+            <div className="flex w-full max-w-full flex-wrap gap-2 overflow-hidden">
+              <Button type="button" size="xs" variant={isAllCategories ? "default" : "outline"} onClick={() => setCategoryFilter([])}>
+                {t("filterAll", locale)}
+              </Button>
+              {availableCategories.map((category) => {
+                const isActive = categoryFilter.includes(category.id);
+                return (
+                  <Button
+                    key={category.id}
+                    type="button"
+                    size="xs"
+                    variant={isActive ? "default" : "outline"}
+                    className={isActive ? "text-white" : undefined}
+                    style={isActive ? { backgroundColor: category.color, borderColor: category.color } : undefined}
+                    onClick={() => {
+                      setCategoryFilter((prev) => {
+                        if (prev.includes(category.id)) {
+                          const next = prev.filter((id) => id !== category.id);
+                          return next.length ? next : [];
+                        }
+                        return [...prev, category.id];
+                      });
+                    }}
+                  >
+                    {category.label[locale]}
+                  </Button>
+                );
+              })}
+              <Button
+                type="button"
+                size="xs"
+                variant={showJournalEntries ? "default" : "outline"}
+                onClick={() => setShowJournalEntries(!showJournalEntries)}
+              >
+                {t("journal", locale)}
+              </Button>
+            </div>
+            <div className="overflow-hidden">
+              <ChartContainer config={chartConfig} className="h-[200px] w-full">
+                <ComposedChart data={chartDataWithHandlers} margin={{ top: 28, left: 12, right: 12, bottom: 6 }}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+                  <YAxis hide domain={[0, (dataMax: number) => Math.max(1, dataMax + 3)]} />
+                  <ChartTooltip cursor={false} content={renderDynamicsTooltip} />
+                  {chartSeriesIds.map((seriesId) => (
+                    <Area
+                      key={seriesId}
+                      dataKey={seriesId}
+                      type="monotone"
+                      fill={`var(--color-${seriesId})`}
+                      fillOpacity={chartSeriesIds.length > 1 ? 0.08 : 0.25}
+                      stroke={`var(--color-${seriesId})`}
+                      strokeWidth={2}
+                      dot={getDotRenderer(seriesId)}
+                      activeDot={getDotRenderer(seriesId)}
+                      isAnimationActive
+                      animationBegin={0}
+                      animationDuration={650}
+                    />
+                  ))}
+                </ComposedChart>
+              </ChartContainer>
+            </div>
           </div>
-          <div className="mt-3 flex w-full max-w-full flex-wrap gap-2 overflow-hidden">
-            <Button type="button" size="xs" variant={isAllCategories ? "default" : "outline"} onClick={() => setCategoryFilter([])}>
-              {t("filterAll", locale)}
-            </Button>
-            {availableCategories.map((category) => {
-              const isActive = categoryFilter.includes(category.id);
-              return (
-                <Button
-                  key={category.id}
-                  type="button"
-                  size="xs"
-                  variant={isActive ? "default" : "outline"}
-                  className={isActive ? "text-white" : undefined}
-                  style={isActive ? { backgroundColor: category.color, borderColor: category.color } : undefined}
-                  onClick={() => {
-                    setCategoryFilter((prev) => {
-                      if (prev.includes(category.id)) {
-                        const next = prev.filter((id) => id !== category.id);
-                        return next.length ? next : [];
-                      }
-                      return [...prev, category.id];
-                    });
-                  }}
-                >
-                  {category.label[locale]}
-                </Button>
-              );
-            })}
-            <Button
-              type="button"
-              size="xs"
-              variant={showJournalEntries ? "default" : "outline"}
-              onClick={() => setShowJournalEntries(!showJournalEntries)}
-            >
-              {t("journal", locale)}
-            </Button>
+
+          <div style={{ maxWidth: "100vw", overflowX: "hidden" }}>
+            <table className="w-full table-fixed text-sm">
+              <tbody>
+                <tr>
+                  <td className="w-1/3 align-top px-3 py-2">
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("totalDoneAll", locale)}</p>
+                    <p className="mt-2 text-2xl font-semibold tabular-nums">
+                      <CountUpValue key={`total-${metricsAnimationKey}`} value={totalDone} enabled={metricAnimationEnabled} />
+                    </p>
+                  </td>
+                  <td className="w-1/3 align-top px-3 py-2" style={{ maxWidth: "100%", overflowX: "hidden", minWidth: "0" }}>
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("avgRhythm", locale)}</p>
+                    <div
+                      className="mt-2 flex items-center justify-start overflow-hidden"
+                      style={{ maxWidth: "96px", overflowX: "hidden", minWidth: "96px", width: "96px" }}
+                    >
+                      <div
+                        className="relative overflow-hidden"
+                        style={{ maxWidth: "96px", overflowX: "hidden", minWidth: "96px", width: "96px" }}
+                      >
+                        <ChartContainer
+                          config={chartConfig}
+                          className="aspect-square w-[96px]"
+                          style={{ maxWidth: "96px", overflowX: "hidden", minWidth: "96px", width: "96px" }}
+                        >
+                          <RadialBarChart data={rhythmChartData} innerRadius={34} outerRadius={44} startAngle={90} endAngle={-270}>
+                            <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+                            <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel nameKey="rhythm" />} />
+                            <RadialBar dataKey="value" background cornerRadius={8} />
+                          </RadialBarChart>
+                        </ChartContainer>
+                        <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-semibold text-foreground">
+                          <CountUpValue key={`rhythm-${metricsAnimationKey}`} value={completionRate} suffix="%" enabled={metricAnimationEnabled} />
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="w-1/3 align-top px-3 py-2">
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("activeHabits", locale)}</p>
+                    <p className="mt-2 text-2xl font-semibold tabular-nums">
+                      <CountUpValue key={`active-${metricsAnimationKey}`} value={filteredHabits.length} enabled={metricAnimationEnabled} />
+                    </p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="w-full max-w-full overflow-hidden">
+        <CardHeader className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base">{t("progressQuote", locale)}</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="overflow-hidden">
-          <ChartContainer config={chartConfig} className="h-[200px] w-full">
-            <ComposedChart data={chartDataWithHandlers} margin={{ top: 28, left: 12, right: 12, bottom: 6 }}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
-              <YAxis hide domain={[0, (dataMax: number) => Math.max(1, dataMax + 3)]} />
-              <ChartTooltip cursor={false} content={renderDynamicsTooltip} />
-              {chartSeriesIds.map((seriesId) => (
-                <Area
-                  key={seriesId}
-                  dataKey={seriesId}
-                  type="monotone"
-                  fill={`var(--color-${seriesId})`}
-                  fillOpacity={chartSeriesIds.length > 1 ? 0.08 : 0.25}
-                  stroke={`var(--color-${seriesId})`}
-                  strokeWidth={2}
-                  dot={getDotRenderer(seriesId)}
-                  activeDot={getDotRenderer(seriesId)}
-                  isAnimationActive
-                  animationBegin={0}
-                  animationDuration={650}
-                />
-              ))}
-            </ComposedChart>
-          </ChartContainer>
+        <CardContent className="space-y-1">
+          <p className="text-sm italic text-muted-foreground">“{locale === "ru" ? quote.ru : quote.en}”</p>
+          <p className="text-xs text-muted-foreground">— {quote.author}</p>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="grid gap-6">
-          <div className="grid gap-2">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("progressInsight", locale)}</p>
-            <p className="text-sm font-medium">{insight}</p>
-          </div>
-          <div className="grid gap-2">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("progressQuote", locale)}</p>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={quoteIndex}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.25 }}
-              >
-                <p className="text-sm italic text-muted-foreground">“{locale === "ru" ? quote.ru : quote.en}”</p>
-                <p className="text-xs text-muted-foreground">— {quote.author}</p>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
+      <Card className="w-full max-w-full overflow-hidden">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">{t("achievements", locale)}</CardTitle>
@@ -1295,7 +1411,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
                 })}
               </div>
               {unlockedAchievements.length > maxAchievements && (
-                <div className="mt-3 flex justify-center">
+                <div className="mt-3 flex justify-center overflow-hidden" style={{ width: '100%', maxWidth: '100vw', overflow: 'hidden', boxSizing: 'border-box', minWidth: '0', flexShrink: '1', flexBasis: '0' }}>
                   <CollapsibleTrigger asChild>
                     <Button type="button" variant="outline">
                       {showAllAchievements ? t("collapseAll", locale) : t("showMore", locale)}

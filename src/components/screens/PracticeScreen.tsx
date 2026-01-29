@@ -700,7 +700,7 @@ const PracticeScreen = ({
             ) : item.type === "stop" ? (
               <button
                 type="button"
-                className="group relative mx-auto flex h-[112px] w-[112px] items-center justify-center overflow-hidden rounded-full border border-red-700/40 bg-gradient-to-b from-red-500 via-red-600 to-red-700 shadow-[0_14px_28px_rgba(127,29,29,0.4),inset_0_2px_6px_rgba(255,255,255,0.3),inset_0_-8px_12px_rgba(0,0,0,0.25)] transition-transform active:translate-y-[2px]"
+                className="group relative mx-auto flex h-[96px] w-[96px] items-center justify-center overflow-hidden rounded-full border border-red-700/40 bg-gradient-to-b from-red-500 via-red-600 to-red-700 shadow-[0_12px_24px_rgba(127,29,29,0.35),inset_0_2px_6px_rgba(255,255,255,0.3),inset_0_-6px_10px_rgba(0,0,0,0.22)] transition-transform active:translate-y-[2px]"
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -709,10 +709,10 @@ const PracticeScreen = ({
                 }}
               >
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.35),_transparent_55%)]" />
-                <div className="absolute inset-3 rounded-full border border-white/15" />
+                <div className="absolute inset-2.5 rounded-full border border-white/15" />
                 <div className="relative grid place-items-center text-center">
                   <span className="text-[11px] uppercase tracking-[0.55em] text-red-100/80">{t("stop", locale)}</span>
-                  <span className="mt-2 text-[28px] font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.45)]">
+                  <span className="mt-2 text-[24px] font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.45)]">
                     STOP
                   </span>
                   <span className="mt-2 text-xs text-red-100/85">{t("breathing", locale)}</span>

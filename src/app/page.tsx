@@ -413,8 +413,8 @@ export default function Home() {
   }
 
   return (
-    <div className="app-root min-h-[100svh] w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-6 text-foreground">
-      <header className="mb-6 flex items-center justify-between gap-4">
+    <div className="app-root min-h-[100svh] w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-6 text-foreground" style={{ maxWidth: '100vw', overflowX: 'hidden' }}>
+      <header className="mb-6 flex items-center justify-between gap-4 overflow-hidden" style={{ maxWidth: '100%', overflowX: 'hidden', minWidth: '0', flexShrink: '1', flexBasis: '0', boxSizing: 'border-box', display: 'block' }}>
         <div className="flex items-center gap-2">
           <Button
             type="button"
