@@ -266,7 +266,7 @@ export const demoStopCrane: StopCraneItem[] = [
   {
     id: "demo-stop-4",
     type: "radio",
-    content: "http://radio.plaza.one/ogg",
+    content: "https://radio.plaza.one/ogg",
     createdAt: new Date().toISOString(),
   },
   {

@@ -178,7 +178,7 @@ const AnchorModal = ({ open, locale, existing, onClose, onSubmit }: AnchorModalP
               onSubmit({
                 id: `anchor-${Date.now()}`,
                 type,
-                content: type === "stop" ? "STOP" : type === "radio" ? "http://radio.plaza.one/ogg" : content.trim(),
+                content: type === "stop" ? "STOP" : type === "radio" ? "https://radio.plaza.one/ogg" : content.trim(),
                 createdAt: new Date().toISOString(),
               })
             }

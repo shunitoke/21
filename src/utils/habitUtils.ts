@@ -32,7 +32,7 @@ export const calculateHabitLogUpdate = (
   }
 
   const updatedEntry = nextLogs.find((log) => log.habitId === habitId && log.date === today);
-  const updatedCount = updatedEntry?.count ?? 1;
+  const updatedCount = updatedEntry ? updatedEntry.count ?? 1 : 0;
   const completed = updatedCount >= target;
 
   return { nextLogs, completed, count: updatedCount };
