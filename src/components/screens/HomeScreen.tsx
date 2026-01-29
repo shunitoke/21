@@ -85,7 +85,6 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
   const pendingOrderRef = useRef(habits);
   const dragBlockRef = useRef(false);
   const dragTimeoutRef = useRef<number | null>(null);
-  const dragHoldTimeoutRef = useRef<number | null>(null);
   const cardDelayRef = useRef(new Map<string, number>());
 
   const logsByHabit = useMemo(() => buildLogsByHabit(logs), [logs]);
@@ -113,7 +112,6 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
   useEffect(() => {
     return () => {
       if (dragTimeoutRef.current) window.clearTimeout(dragTimeoutRef.current);
-      if (dragHoldTimeoutRef.current) window.clearTimeout(dragHoldTimeoutRef.current);
     };
   }, []);
 
@@ -155,23 +153,43 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
     delay: number;
   }) => {
     const dragControls = useDragControls();
+    const holdTimeoutRef = useRef<number | null>(null);
+    const pressPointRef = useRef<{ x: number; y: number } | null>(null);
+    const pointerEventRef = useRef<PointerEvent<HTMLLIElement> | null>(null);
 
     const clearHoldTimeout = () => {
-      if (dragHoldTimeoutRef.current) {
-        window.clearTimeout(dragHoldTimeoutRef.current);
-        dragHoldTimeoutRef.current = null;
+      if (holdTimeoutRef.current) {
+        window.clearTimeout(holdTimeoutRef.current);
+        holdTimeoutRef.current = null;
       }
     };
 
     const handlePointerDown = (event: PointerEvent<HTMLLIElement>) => {
       clearHoldTimeout();
-      dragHoldTimeoutRef.current = window.setTimeout(() => {
-        dragControls.start(event);
+      pressPointRef.current = { x: event.clientX, y: event.clientY };
+      pointerEventRef.current = event;
+      holdTimeoutRef.current = window.setTimeout(() => {
+        if (pointerEventRef.current) {
+          dragControls.start(pointerEventRef.current);
+        }
       }, 180);
+    };
+
+    const handlePointerMove = (event: PointerEvent<HTMLLIElement>) => {
+      if (!pressPointRef.current) return;
+      const dx = Math.abs(event.clientX - pressPointRef.current.x);
+      const dy = Math.abs(event.clientY - pressPointRef.current.y);
+      if (dx > 8 || dy > 8) {
+        clearHoldTimeout();
+        pressPointRef.current = null;
+        pointerEventRef.current = null;
+      }
     };
 
     const handlePointerEnd = () => {
       clearHoldTimeout();
+      pressPointRef.current = null;
+      pointerEventRef.current = null;
     };
 
     return (
@@ -197,6 +215,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
         }}
         whileDrag={{ scale: 1.02, cursor: "grabbing" }}
         onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
         onPointerLeave={handlePointerEnd}

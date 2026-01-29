@@ -501,6 +501,44 @@ const PracticeScreen = ({
   const AnchorReorderItem = ({ item }: { item: StopCraneItem }) => {
     const dragControls = useDragControls();
     const wobbleIndex = orderedStopCrane.findIndex((anchor) => anchor.id === item.id);
+    const holdTimeoutRef = useRef<number | null>(null);
+    const pressPointRef = useRef<{ x: number; y: number } | null>(null);
+    const pointerEventRef = useRef<React.PointerEvent<HTMLDivElement> | null>(null);
+
+    const clearHoldTimeout = () => {
+      if (holdTimeoutRef.current) {
+        window.clearTimeout(holdTimeoutRef.current);
+        holdTimeoutRef.current = null;
+      }
+    };
+
+    const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+      clearHoldTimeout();
+      pressPointRef.current = { x: event.clientX, y: event.clientY };
+      pointerEventRef.current = event;
+      holdTimeoutRef.current = window.setTimeout(() => {
+        if (pointerEventRef.current) {
+          dragControls.start(pointerEventRef.current);
+        }
+      }, 180);
+    };
+
+    const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!pressPointRef.current) return;
+      const dx = Math.abs(event.clientX - pressPointRef.current.x);
+      const dy = Math.abs(event.clientY - pressPointRef.current.y);
+      if (dx > 8 || dy > 8) {
+        clearHoldTimeout();
+        pressPointRef.current = null;
+        pointerEventRef.current = null;
+      }
+    };
+
+    const handlePointerEnd = () => {
+      clearHoldTimeout();
+      pressPointRef.current = null;
+      pointerEventRef.current = null;
+    };
 
     return (
       <motion.div
@@ -515,12 +553,17 @@ const PracticeScreen = ({
         dragSnapToOrigin
         style={
           anchorWobbleActive
-            ? { touchAction: "none", width: "100%", animationDelay: `${Math.max(0, wobbleIndex) * 60}ms` }
-            : { touchAction: "none", width: "100%" }
+            ? { touchAction: "auto", width: "100%", animationDelay: `${Math.max(0, wobbleIndex) * 60}ms` }
+            : { touchAction: "auto", width: "100%" }
         }
         whileDrag={{ scale: 1.03, boxShadow: "0 16px 38px rgba(0,0,0,0.22)", cursor: "grabbing", zIndex: 20 }}
         transition={{ type: "spring", stiffness: 540, damping: 38 }}
         className={`grid gap-2 ${anchorWobbleActive ? "animate-anchor-wobble" : ""}`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onPointerLeave={handlePointerEnd}
         onDragStart={() => {
           triggerAnchorWobble();
           blockClick();
@@ -555,22 +598,6 @@ const PracticeScreen = ({
               <button
                 type="button"
                 className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground"
-                onPointerDown={(event) => {
-                  event.stopPropagation();
-                  if (anchorHoldTimeoutRef.current) window.clearTimeout(anchorHoldTimeoutRef.current);
-                  anchorHoldTimeoutRef.current = window.setTimeout(() => {
-                    dragControls.start(event);
-                  }, 180);
-                }}
-                onPointerUp={() => {
-                  if (anchorHoldTimeoutRef.current) window.clearTimeout(anchorHoldTimeoutRef.current);
-                }}
-                onPointerLeave={() => {
-                  if (anchorHoldTimeoutRef.current) window.clearTimeout(anchorHoldTimeoutRef.current);
-                }}
-                onPointerCancel={() => {
-                  if (anchorHoldTimeoutRef.current) window.clearTimeout(anchorHoldTimeoutRef.current);
-                }}
                 aria-label={t("drag", locale)}
               >
                 <GripVertical size={14} />
