@@ -1326,13 +1326,15 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
             </div>
           </div>
 
+          <Separator className="my-3" />
+
           <div style={{ maxWidth: "100vw", overflowX: "hidden" }}>
             <table className="w-full table-fixed text-sm">
               <tbody>
                 <tr>
                   <td className="w-1/3 align-top px-3 py-2">
                     <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("totalDoneAll", locale)}</p>
-                    <p className="mt-2 text-2xl font-semibold tabular-nums">
+                    <p className="mt-2 text-xl font-semibold tabular-nums">
                       <CountUpValue key={`total-${metricsAnimationKey}`} value={totalDone} enabled={metricAnimationEnabled} />
                     </p>
                   </td>
@@ -1365,7 +1367,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
                   </td>
                   <td className="w-1/3 align-top px-3 py-2">
                     <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("activeHabits", locale)}</p>
-                    <p className="mt-2 text-2xl font-semibold tabular-nums">
+                    <p className="mt-2 text-xl font-semibold tabular-nums">
                       <CountUpValue key={`active-${metricsAnimationKey}`} value={filteredHabits.length} enabled={metricAnimationEnabled} />
                     </p>
                   </td>

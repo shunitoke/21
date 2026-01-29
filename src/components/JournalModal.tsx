@@ -205,12 +205,12 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
 
   return (
     <Dialog open={open} onOpenChange={(value) => (!value ? handleClose() : null)}>
-      <DialogContent className="max-w-[520px] gap-4">
+      <DialogContent className="max-w-[520px] gap-4 max-h-[80svh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>{t("newEntryTitle", locale)}</DialogTitle>
           <DialogDescription className="sr-only">{t("dialogDetails", locale)}</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-3">
+        <div className="grid gap-3 overflow-y-auto pr-1" style={{ maxHeight: "calc(80svh - 160px)" }}>
           <Card className="p-3">
             <p className="text-xs text-muted-foreground">{t("chooseEmotions", locale)}</p>
             <div className="mt-2">
