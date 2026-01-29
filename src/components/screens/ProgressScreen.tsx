@@ -1209,7 +1209,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
 
           <Separator className="my-3" />
 
-          <div className="space-y-4">
+          <div className="space-y-4 pt-3">
             <div className="flex min-w-0 items-start justify-between gap-3">
               <div>
                 <p className="text-base font-semibold">{t("dynamics", locale)}</p>
@@ -1358,7 +1358,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
         </CardContent>
       </Card>
 
-      <Card className="w-full max-w-full overflow-hidden">
+      <Card className="w-full max-w-full">
         <CardHeader className="space-y-2">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-base">{t("progressQuote", locale)}</CardTitle>
@@ -1370,7 +1370,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
         </CardContent>
       </Card>
 
-      <Card className="w-full max-w-full overflow-hidden">
+      <Card className="w-full overflow-visible">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">{t("achievements", locale)}</CardTitle>
@@ -1408,7 +1408,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
 
       <Dialog open={Boolean(selectedEntries)} onOpenChange={(value) => (!value ? setSelectedEntries(null) : null)}>
         <DialogContent
-          className="max-w-[560px]"
+          className="max-w-[560px] max-h-[70svh] overflow-hidden"
           onOpenAutoFocus={(event) => {
             event.preventDefault();
             journalDialogFocusRef.current?.focus();
@@ -1419,7 +1419,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
             <DialogTitle>{t("journal", locale)}</DialogTitle>
             <DialogDescription className="sr-only">{t("dialogDetails", locale)}</DialogDescription>
           </DialogHeader>
-          <div className="mt-2 grid gap-3">
+          <div className="mt-2 grid gap-3 overflow-y-auto pr-1" style={{ maxHeight: "calc(70svh - 140px)" }}>
             {selectedEntries?.map((entry) => (
               <Card
                 key={entry.id}

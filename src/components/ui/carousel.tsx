@@ -122,14 +122,8 @@ function Carousel({
     >
       <div
         onKeyDownCapture={handleKeyDown}
-        onPointerDownCapture={(event) => {
-          onPointerDownCapture?.(event);
-          event.stopPropagation();
-        }}
-        onTouchStartCapture={(event) => {
-          onTouchStartCapture?.(event);
-          event.stopPropagation();
-        }}
+        onPointerDownCapture={onPointerDownCapture}
+        onTouchStartCapture={onTouchStartCapture}
         className={cn("relative max-w-full overflow-hidden", className)}
         role="region"
         aria-roledescription="carousel"

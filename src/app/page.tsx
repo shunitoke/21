@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useDragControls } from "framer-motion";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Home as HomeIcon, LineChart, Loader2, Plus, Settings, Sparkles } from "lucide-react";
@@ -28,6 +28,9 @@ export default function Home() {
   const [radioBuffering, setRadioBuffering] = useState(false);
   const radioAudioRef = useRef<HTMLAudioElement | null>(null);
   const pendingScrollResetRef = useRef(false);
+  const dragControls = useDragControls();
+  const didSwipeRef = useRef(false);
+  const dragStartXRef = useRef<number | null>(null);
   const [frozenSnapshot, setFrozenSnapshot] = useState<{
     screen: ReturnType<typeof useAppStore.getState>["screen"];
     sortedHabits: Habit[];
@@ -226,7 +229,8 @@ export default function Home() {
   );
 
   useEffect(() => {
-    const getHasOverlay = () => Boolean(document.querySelector('[data-slot="dialog-overlay"]'));
+    const getHasOverlay = () =>
+      Boolean(document.querySelector('[data-slot="dialog-overlay"][data-state="open"]'));
     const update = () => {
       const next = getHasOverlay();
       setHasDialogOverlay(next);
@@ -413,7 +417,31 @@ export default function Home() {
   }
 
   return (
-    <div className="app-root min-h-[100svh] w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-6 text-foreground" style={{ maxWidth: '100vw', overflowX: 'hidden' }}>
+    <div
+      className="app-root min-h-[100svh] w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-6 text-foreground"
+      style={{ maxWidth: '100vw', overflowX: 'hidden' }}
+      onPointerDownCapture={(event) => {
+        if (hasDialogOverlay) return;
+        didSwipeRef.current = false;
+        dragControls.start(event);
+      }}
+      onMouseDownCapture={(event) => {
+        if (hasDialogOverlay) return;
+        didSwipeRef.current = false;
+        dragControls.start(event as unknown as PointerEvent);
+      }}
+      onTouchStartCapture={(event) => {
+        if (hasDialogOverlay) return;
+        didSwipeRef.current = false;
+        dragControls.start(event as unknown as PointerEvent);
+      }}
+      onClickCapture={(event) => {
+        if (!didSwipeRef.current) return;
+        event.preventDefault();
+        event.stopPropagation();
+        didSwipeRef.current = false;
+      }}
+    >
       <header className="mb-6 flex items-center justify-between gap-4 overflow-hidden" style={{ maxWidth: '100%', overflowX: 'hidden', minWidth: '0', flexShrink: '1', flexBasis: '0', boxSizing: 'border-box' }}>
         <div className="flex items-center gap-2">
           <Button
@@ -490,14 +518,33 @@ export default function Home() {
           className="w-full"
           transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
           drag={background.screen === "home" || background.screen === "progress" || background.screen === "practice" ? "x" : false}
+          dragControls={dragControls}
+          dragListener={false}
           dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.08}
+          dragElastic={0.12}
+          style={{ touchAction: "pan-y" }}
+          onDragStart={(_, info) => {
+            didSwipeRef.current = false;
+            dragStartXRef.current = info.point.x;
+          }}
+          onDrag={(_, info) => {
+            if (dragStartXRef.current === null) return;
+            if (Math.abs(info.point.x - dragStartXRef.current) > 10) {
+              didSwipeRef.current = true;
+            }
+          }}
           onDragEnd={(_, info) => {
             if (hasDialogOverlay) return;
             const offset = info.offset.x;
             const velocity = info.velocity.x;
-            if (offset < -60 || velocity < -600) handleSwipe(1);
-            else if (offset > 60 || velocity > 600) handleSwipe(-1);
+            if (offset < -60 || velocity < -600) {
+              handleSwipe(1);
+              didSwipeRef.current = true;
+            } else if (offset > 60 || velocity > 600) {
+              handleSwipe(-1);
+              didSwipeRef.current = true;
+            }
+            dragStartXRef.current = null;
           }}
         >
           {background.screen === "home" && (
@@ -547,33 +594,33 @@ export default function Home() {
       </AnimatePresence>
       <audio ref={radioAudioRef} preload="none" />
       <nav className="fixed inset-x-0 bottom-4 z-40 flex justify-center">
-        <div className="flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-2 shadow-lg backdrop-blur-md">
+        <div className="flex items-center gap-3 rounded-full border border-border/60 bg-background/80 px-4 py-3 shadow-lg backdrop-blur-md">
           <Button
             type="button"
-            size="icon"
+            size="icon-lg"
             variant={background.screen === "home" ? "default" : "ghost"}
             aria-label={t("homeTitle", locale)}
             onClick={() => setScreenWithDirection("home")}
           >
-            <HomeIcon size={16} />
+            <HomeIcon size={18} />
           </Button>
           <Button
             type="button"
-            size="icon"
+            size="icon-lg"
             variant={background.screen === "progress" ? "default" : "ghost"}
             aria-label={t("progressTitle", locale)}
             onClick={() => setScreenWithDirection("progress")}
           >
-            <LineChart size={16} />
+            <LineChart size={18} />
           </Button>
           <Button
             type="button"
-            size="icon"
+            size="icon-lg"
             variant={background.screen === "practice" ? "default" : "ghost"}
             aria-label={t("practiceTitle", locale)}
             onClick={() => setScreenWithDirection("practice")}
           >
-            <Sparkles size={16} />
+            <Sparkles size={18} />
           </Button>
         </div>
       </nav>
