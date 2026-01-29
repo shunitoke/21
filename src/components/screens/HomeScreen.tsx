@@ -198,9 +198,14 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
               style={{ boxShadow: draggingHabitId === habit.id ? "0 18px 40px rgba(0,0,0,0.2)" : "none" }}
               initial={{ opacity: 0.25, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ type: "spring", stiffness: 260, damping: 28, delay }}
+              transition={{
+                type: "spring",
+                stiffness: 260,
+                damping: 28,
+                delay,
+                layout: { type: "spring", stiffness: 520, damping: 38 },
+              }}
               whileDrag={{ scale: 1.02, cursor: "grabbing" }}
-              layoutTransition={{ type: "spring", stiffness: 520, damping: 38 }}
               onDragStart={() => {
                 blockClick();
                 setDraggingHabitId(habit.id);
