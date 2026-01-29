@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { HabitLog } from "@/lib/types";
 import { getPastDays } from "@/lib/date";
 
@@ -28,7 +28,7 @@ const Heatmap = ({
   const [cellSize, setCellSize] = useState(10);
   const [cellGap, setCellGap] = useState(2);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const updateSizes = () => {
       const isCompact = window.matchMedia("(max-width: 640px)").matches;
       setCellSize(isCompact ? 8 : 10);
@@ -39,20 +39,29 @@ const Heatmap = ({
     return () => window.removeEventListener("resize", updateSizes);
   }, []);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!containerRef.current) return;
+    let frame = 0;
     const updateColumns = () => {
+      if (!containerRef.current) return;
       const width =
-        containerRef.current?.parentElement?.getBoundingClientRect().width ??
-        containerRef.current?.getBoundingClientRect().width ??
+        containerRef.current.parentElement?.getBoundingClientRect().width ??
+        containerRef.current.getBoundingClientRect().width ??
         0;
       const nextColumns = Math.max(1, Math.floor((width + cellGap) / (cellSize + cellGap)));
       setMaxColumns(nextColumns);
     };
-    updateColumns();
-    const observer = new ResizeObserver(updateColumns);
+    const scheduleUpdate = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(updateColumns);
+    };
+    scheduleUpdate();
+    const observer = new ResizeObserver(scheduleUpdate);
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, [cellGap, cellSize]);
 
   const logMap = useMemo(() => {

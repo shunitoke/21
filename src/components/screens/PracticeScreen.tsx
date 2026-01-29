@@ -1,14 +1,15 @@
 "use client";
 
 import { motion, useDragControls } from "framer-motion";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ChevronDown, ChevronUp, Filter, GripVertical, Moon, Pause, Play, Sun, Trash2, X } from "lucide-react";
 import type { JournalEntry, Locale, StopCraneItem } from "@/lib/types";
 import { t } from "@/lib/i18n";
-import JournalModal from "@/components/JournalModal";
-import AnchorModal from "@/components/AnchorModal";
-import AudioAnchor from "@/components/AudioAnchor";
-import EmotionSelector from "@/components/EmotionSelector";
+const JournalModal = dynamic(() => import("@/components/JournalModal"), { ssr: false });
+const AnchorModal = dynamic(() => import("@/components/AnchorModal"), { ssr: false });
+const AudioAnchor = dynamic(() => import("@/components/AudioAnchor"), { ssr: false });
+const EmotionSelector = dynamic(() => import("@/components/EmotionSelector"), { ssr: false });
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
