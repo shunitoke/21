@@ -283,6 +283,16 @@ html {
   max-width: 100vw;
 }
 
+/* Allow horizontal swipes to pass through to screen navigation */
+[data-slot="chart"],
+[data-slot="carousel"],
+[data-slot="carousel-content"],
+.recharts-wrapper,
+.recharts-surface,
+.recharts-responsive-container {
+  touch-action: pan-y !important;
+}
+
 @media (max-width: 640px) {
   html {
     font-size: 14px;

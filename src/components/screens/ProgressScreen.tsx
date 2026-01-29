@@ -1094,14 +1094,15 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
   const metricAnimationEnabled = isPageVisible && isActive;
 
   return (
-    <div className="grid gap-6 max-w-full overflow-x-hidden" style={{ maxWidth: '100vw', overflowX: 'hidden', width: '100%', minWidth: '0', flexShrink: '1', flexBasis: '0', boxSizing: 'border-box' }}>
+    <div className="grid gap-6 max-w-full" style={{ maxWidth: '100vw', width: '100%', minWidth: '0', flexShrink: '1', flexBasis: '0', boxSizing: 'border-box', touchAction: 'pan-y' }}>
       <Card className="w-full max-w-full overflow-hidden">
         <CardContent className="space-y-6">
           {isCompact ? (
             <Carousel
-              opts={{ align: "start", loop: true }}
+              opts={{ align: "start", loop: true, watchDrag: false, watchSlides: false }}
               setApi={setMetricsCarouselApi}
               className="relative max-w-full overflow-hidden"
+              style={{ touchAction: 'pan-y' }}
             >
               <CarouselContent className="max-w-full">
                 {carouselMetrics.map((metric, index) => (
@@ -1153,9 +1154,10 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
             </Carousel>
           ) : (
             <Carousel
-              opts={{ align: "start", loop: true }}
+              opts={{ align: "start", loop: true, watchDrag: false, watchSlides: false }}
               setApi={setMetricsCarouselApi}
               className="relative max-w-full overflow-hidden"
+              style={{ touchAction: 'pan-y' }}
             >
               <CarouselContent className="max-w-full">
                 {carouselMetrics.map((metric, index) => (
@@ -1278,8 +1280,8 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
                 {t("journal", locale)}
               </Button>
             </div>
-            <div className="overflow-hidden">
-              <ChartContainer config={chartConfig} className="h-[200px] w-full">
+            <div className="overflow-hidden" style={{ touchAction: 'pan-y' }}>
+              <ChartContainer config={chartConfig} className="h-[200px] w-full" style={{ touchAction: 'pan-y' }}>
                 <ComposedChart data={chartDataWithHandlers} margin={{ top: 28, left: 12, right: 12, bottom: 6 }}>
                   <CartesianGrid vertical={false} />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
@@ -1331,7 +1333,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
                         <ChartContainer
                           config={chartConfig}
                           className="aspect-square w-[96px]"
-                          style={{ maxWidth: "96px", overflowX: "hidden", minWidth: "96px", width: "96px" }}
+                          style={{ maxWidth: "96px", overflowX: "hidden", minWidth: "96px", width: "96px", touchAction: 'pan-y' }}
                         >
                           <RadialBarChart data={rhythmChartData} innerRadius={34} outerRadius={44} startAngle={90} endAngle={-270}>
                             <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />

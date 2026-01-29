@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, useDragControls } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Home as HomeIcon, LineChart, Loader2, Plus, Settings, Sparkles } from "lucide-react";
@@ -28,7 +28,6 @@ export default function Home() {
   const [radioBuffering, setRadioBuffering] = useState(false);
   const radioAudioRef = useRef<HTMLAudioElement | null>(null);
   const pendingScrollResetRef = useRef(false);
-  const dragControls = useDragControls();
   const didSwipeRef = useRef(false);
   const dragStartXRef = useRef<number | null>(null);
   const [frozenSnapshot, setFrozenSnapshot] = useState<{
@@ -420,21 +419,6 @@ export default function Home() {
     <div
       className="app-root min-h-[100svh] w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-6 text-foreground"
       style={{ maxWidth: '100vw', overflowX: 'hidden', touchAction: 'pan-y' }}
-      onPointerDownCapture={(event) => {
-        if (hasDialogOverlay) return;
-        didSwipeRef.current = false;
-        dragControls.start(event);
-      }}
-      onMouseDownCapture={(event) => {
-        if (hasDialogOverlay) return;
-        didSwipeRef.current = false;
-        dragControls.start(event as unknown as PointerEvent);
-      }}
-      onTouchStartCapture={(event) => {
-        if (hasDialogOverlay) return;
-        didSwipeRef.current = false;
-        dragControls.start(event as unknown as PointerEvent);
-      }}
       onClickCapture={(event) => {
         if (!didSwipeRef.current) return;
         event.preventDefault();
@@ -518,8 +502,6 @@ export default function Home() {
           className="w-full"
           transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
           drag={background.screen === "home" || background.screen === "progress" || background.screen === "practice" ? "x" : false}
-          dragControls={dragControls}
-          dragListener={false}
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.12}
           style={{ touchAction: "pan-y" }}
