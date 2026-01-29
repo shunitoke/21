@@ -258,6 +258,7 @@ const PracticeScreen = ({
   const [tempSelectedEmotions, setTempSelectedEmotions] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(8);
   const [orderedStopCrane, setOrderedStopCrane] = useState(stopCrane);
+  const [imageThumbs, setImageThumbs] = useState<Record<string, string>>({});
   const anchorGridRef = useRef<HTMLDivElement | null>(null);
   const dragBlockRef = useRef(false);
   const dragTimeoutRef = useRef<number | null>(null);
@@ -335,6 +336,51 @@ const PracticeScreen = ({
   useEffect(() => {
     setOrderedStopCrane(stopCrane);
   }, [stopCrane]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadThumbnail = async (id: string, src: string) => {
+      if (imageThumbs[id]) return;
+      try {
+        const img = new Image();
+        img.decoding = "async";
+        img.crossOrigin = "anonymous";
+        img.src = src;
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error("Image load failed"));
+        });
+        const maxSize = 240;
+        const scale = Math.min(1, maxSize / Math.max(img.naturalWidth, img.naturalHeight));
+        const width = Math.max(1, Math.round(img.naturalWidth * scale));
+        const height = Math.max(1, Math.round(img.naturalHeight * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas context unavailable");
+        ctx.drawImage(img, 0, 0, width, height);
+        const thumb = canvas.toDataURL("image/jpeg", 0.72);
+        if (!cancelled) {
+          setImageThumbs((prev) => (prev[id] ? prev : { ...prev, [id]: thumb }));
+        }
+      } catch {
+        if (!cancelled) {
+          setImageThumbs((prev) => (prev[id] ? prev : { ...prev, [id]: src }));
+        }
+      }
+    };
+
+    orderedStopCrane
+      .filter((item) => item.type === "image")
+      .forEach((item) => {
+        void loadThumbnail(item.id, item.content);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orderedStopCrane, imageThumbs]);
 
   useEffect(() => {
     return () => {
@@ -643,7 +689,13 @@ const PracticeScreen = ({
                   setImagePreview(item.content);
                 }}
               >
-                <img src={item.content} alt="" className="h-40 w-full object-cover" />
+                <img
+                  src={imageThumbs[item.id] ?? item.content}
+                  alt=""
+                  className="h-40 w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
               </button>
             ) : item.type === "stop" ? (
               <button

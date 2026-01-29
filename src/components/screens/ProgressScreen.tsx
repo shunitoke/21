@@ -1058,7 +1058,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
   }, [achievementGroupOrder, getAchievementGroup, groupedAchievements, showAllAchievements, visibleGroupedAchievements]);
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-4 max-w-full overflow-x-hidden">
       <Carousel
         opts={{ align: "start", loop: true }}
         setApi={setMetricsCarouselApi}
@@ -1145,7 +1145,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
 
       <Card>
         <CardHeader>
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start justify-between gap-3">
             <div>
               <CardTitle className="text-base">{t("dynamics", locale)}</CardTitle>
               <p className="text-xs text-muted-foreground">
@@ -1163,7 +1163,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
               variant="outline"
               size="sm"
               spacing={0}
-              className="flex flex-wrap"
+              className="flex max-w-full flex-wrap"
             >
               <ToggleGroupItem value="week" size="sm">
                 {t("periodWeek", locale)}
@@ -1176,7 +1176,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex max-w-full flex-wrap gap-2">
             <Button type="button" size="xs" variant={isAllCategories ? "default" : "outline"} onClick={() => setCategoryFilter([])}>
               {t("filterAll", locale)}
             </Button>
@@ -1214,7 +1214,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-hidden">
           <ChartContainer config={chartConfig} className="h-[200px] w-full">
             <ComposedChart data={chartDataWithHandlers} margin={{ top: 28, left: 12, right: 12, bottom: 6 }}>
               <CartesianGrid vertical={false} />
