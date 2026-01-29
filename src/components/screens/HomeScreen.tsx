@@ -85,6 +85,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
   const pendingOrderRef = useRef(habits);
   const dragBlockRef = useRef(false);
   const dragTimeoutRef = useRef<number | null>(null);
+  const cardDelayRef = useRef(new Map<string, number>());
 
   const logsByHabit = useMemo(() => buildLogsByHabit(logs), [logs]);
 
@@ -178,6 +179,13 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
           const Icon = habit.category ? getCategoryMeta(habit.category).icon : Tag;
           const shake = shakeMap[habit.id];
           const shakeClass = getShakeClass(shake);
+          const delay = (() => {
+            const existing = cardDelayRef.current.get(habit.id);
+            if (existing !== undefined) return existing;
+            const next = 0.04 + Math.random() * 0.18;
+            cardDelayRef.current.set(habit.id, next);
+            return next;
+          })();
 
           return (
             <Reorder.Item
@@ -188,8 +196,11 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
               dragElastic={0.18}
               dragMomentum={false}
               style={{ boxShadow: draggingHabitId === habit.id ? "0 18px 40px rgba(0,0,0,0.2)" : "none" }}
+              initial={{ opacity: 0.25, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 28, delay }}
               whileDrag={{ scale: 1.02, cursor: "grabbing" }}
-              transition={{ type: "spring", stiffness: 520, damping: 38 }}
+              layoutTransition={{ type: "spring", stiffness: 520, damping: 38 }}
               onDragStart={() => {
                 blockClick();
                 setDraggingHabitId(habit.id);
@@ -206,9 +217,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
                 onOpen(habit);
               }}
             >
-              <Card
-                className={done ? "transition-[box-shadow,transform] duration-200 ease-out shadow-md shadow-foreground/10" : undefined}
-              >
+              <Card>
               <CardContent>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                 <div className="flex min-w-0 items-start gap-3">
