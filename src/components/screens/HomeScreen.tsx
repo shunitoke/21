@@ -204,6 +204,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
           boxShadow: draggingHabitId === habit.id ? "0 18px 40px rgba(0,0,0,0.2)" : "none",
           touchAction: dragActive ? "none" : "pan-y",
         }}
+        initial={{ opacity: 0.25, y: 12 }}
         transition={{
           layout: { type: "spring", stiffness: 520, damping: 38 },
         }}
