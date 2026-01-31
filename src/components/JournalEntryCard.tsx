@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 import { FileText, Mic, Trash2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { JournalEntry, Locale } from "@/lib/types";
 import { t } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
@@ -99,70 +100,73 @@ const JournalEntryCard = memo(function JournalEntryCard({
 }: JournalEntryCardProps) {
   const isAudio = entry.type === "audio";
 
-  // Collapsed view - only show time and icon in a compact row
-  if (collapsed) {
-    return (
-      <div className="relative flex gap-3">
-        <div className="flex flex-col items-center">
-          {!isFirstOfDay && <div className="w-px h-3 bg-border" />}
-          <div className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-muted bg-background">
-            {isAudio ? (
-              <Mic className="h-3 w-3 text-muted-foreground" />
-            ) : (
-              <FileText className="h-3 w-3 text-muted-foreground" />
-            )}
-          </div>
-          {!isLastOfDay && <div className="w-px flex-1 bg-border min-h-[12px]" />}
-        </div>
-
-        <div className="flex-1 pb-2">
-          {isFirstOfDay && (
-            <div className="mb-1 flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {formatDate(entry.date, locale)}
-              </span>
-              <Separator className="flex-1" />
-            </div>
-          )}
-          <div className="flex items-center gap-2 py-1">
-            <span className="text-xs text-muted-foreground">
-              {formatTime(entry.date, entry.timezoneOffset, locale)}
-            </span>
-            {entry.emotions && entry.emotions.length > 0 && (
-              <span className="text-xs text-muted-foreground">
-                {entry.emotions.length} {locale === "ru" ? "эмоций" : "emotions"}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Expanded view - full card with content
   return (
     <div className="relative flex gap-3">
       <div className="flex flex-col items-center">
         {!isFirstOfDay && <div className="w-px h-3 bg-border" />}
-        <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-muted bg-background">
+        <motion.div 
+          className="relative z-10 flex shrink-0 items-center justify-center rounded-full border-2 border-muted bg-background"
+          animate={{
+            width: collapsed ? 24 : 32,
+            height: collapsed ? 24 : 32,
+            borderWidth: collapsed ? 1 : 2,
+          }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        >
           {isAudio ? (
-            <Mic className="h-3.5 w-3.5 text-muted-foreground" />
+            <Mic className="text-muted-foreground" style={{ width: collapsed ? 12 : 14, height: collapsed ? 12 : 14 }} />
           ) : (
-            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+            <FileText className="text-muted-foreground" style={{ width: collapsed ? 12 : 14, height: collapsed ? 12 : 14 }} />
           )}
-        </div>
+        </motion.div>
         {!isLastOfDay && <div className="w-px flex-1 bg-border min-h-[16px]" />}
       </div>
 
       <div className="flex-1 pb-4">
-        {isFirstOfDay && (
-          <div className="mb-2 flex items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              {formatDate(entry.date, locale)}
-            </span>
-            <Separator className="flex-1" />
-          </div>
-        )}
+        <AnimatePresence>
+          {isFirstOfDay && (
+            <motion.div 
+              className="mb-2 flex items-center gap-2"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                {formatDate(entry.date, locale)}
+              </span>
+              <Separator className="flex-1" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence mode="wait">
+          {collapsed ? (
+            <motion.div
+              key="collapsed"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+              className="flex items-center gap-2 py-1"
+            >
+              <span className="text-xs text-muted-foreground">
+                {formatTime(entry.date, entry.timezoneOffset, locale)}
+              </span>
+              {entry.emotions && entry.emotions.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {entry.emotions.length} {locale === "ru" ? "эмоций" : "emotions"}
+                </span>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="expanded"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+            >
 
         <Card className="transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0">
           <CardContent className="p-3">
@@ -209,6 +213,9 @@ const JournalEntryCard = memo(function JournalEntryCard({
             )}
           </CardContent>
         </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

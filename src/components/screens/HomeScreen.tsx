@@ -314,6 +314,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string);
     document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
     vibrationFeedback.dragStart();
   }, []);
 
@@ -321,6 +322,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
     const { active, over } = event;
     setActiveId(null);
     document.body.style.overflow = "";
+    document.body.style.touchAction = "";
 
     if (over && active.id !== over.id) {
       const oldIndex = orderedHabits.findIndex((item) => item.id === active.id);

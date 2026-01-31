@@ -539,7 +539,7 @@ const PracticeScreen = ({
 
   const [activeAnchorId, setActiveAnchorId] = useState<string | null>(null);
 
-  const SortableAnchorItem = ({ item }: { item: StopCraneItem }) => {
+  const SortableAnchorItem = ({ item, index }: { item: StopCraneItem; index: number }) => {
     const {
       attributes,
       listeners,
@@ -557,8 +557,12 @@ const PracticeScreen = ({
       opacity: isDragging ? 0 : 1,
     };
 
+    const wobbleClass = anchorWobbleActive
+      ? ["animate-anchor-wobble", "animate-anchor-wobble-1", "animate-anchor-wobble-2", "animate-anchor-wobble-3"][index % 4]
+      : "";
+
     return (
-      <div ref={setNodeRef} style={style} className={`grid gap-2 ${anchorWobbleActive ? "animate-anchor-wobble" : ""}`}>
+      <div ref={setNodeRef} style={style} className={`grid gap-2 ${wobbleClass}`}>
         <Card 
           className="transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
           style={{
@@ -615,7 +619,7 @@ const PracticeScreen = ({
             ) : item.type === "stop" ? (
               <button
                 type="button"
-                className={`group relative mx-auto flex h-[96px] w-[96px] items-center justify-center overflow-hidden rounded-full border border-red-700/40 bg-gradient-to-b from-red-500 via-red-600 to-red-700 shadow-[0_12px_24px_rgba(127,29,29,0.35),inset_0_2px_6px_rgba(255,255,255,0.3),inset_0_-6px_10px_rgba(0,0,0,0.22)] transition-transform active:translate-y-[2px] ${anchorWobbleActive ? "animate-anchor-wobble" : ""}`}
+                className={`group relative mx-auto flex h-[96px] w-[96px] items-center justify-center overflow-hidden rounded-full border border-red-700/40 bg-gradient-to-b from-red-500 via-red-600 to-red-700 shadow-[0_12px_24px_rgba(127,29,29,0.35),inset_0_2px_6px_rgba(255,255,255,0.3),inset_0_-6px_10px_rgba(0,0,0,0.22)] transition-transform active:translate-y-[2px] ${wobbleClass}`}
                 onClick={(event) => {
                   event.stopPropagation();
                   setBreathingOpen(true);
@@ -685,8 +689,8 @@ const PracticeScreen = ({
                   className="relative grid grid-cols-2 gap-3 pb-2"
                   style={{ contain: 'layout paint style' }}
                 >
-                  {orderedStopCrane.map((item) => (
-                    <SortableAnchorItem key={item.id} item={item} />
+                  {orderedStopCrane.map((item, index) => (
+                    <SortableAnchorItem key={item.id} item={item} index={index} />
                   ))}
                 </div>
               </SortableContext>

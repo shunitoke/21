@@ -17,6 +17,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import AudioAnchor from "@/components/AudioAnchor";
 import EmotionSelector from "@/components/EmotionSelector";
+import { vibrationFeedback, triggerVibration } from "@/utils/vibrationUtils";
 
 interface JournalModalProps {
   open: boolean;
@@ -24,6 +25,12 @@ interface JournalModalProps {
   onClose: () => void;
   onSubmit: (entry: JournalEntry) => void;
 }
+
+const formatDuration = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
 
 const usePageVisibility = () => {
   const [isVisible, setIsVisible] = useState(() => (typeof document === "undefined" ? true : !document.hidden));
@@ -46,7 +53,9 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
   const [recorder, setRecorder] = useState<MediaRecorder | null>(null);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
-  const [spectrumData, setSpectrumData] = useState<number[]>(new Array(20).fill(8));
+  const [spectrumData, setSpectrumData] = useState<number[]>(new Array(32).fill(4));
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const animationRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -67,6 +76,11 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
 
     setRecorder(null);
     setRecording(false);
+    setRecordingDuration(0);
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
+    }
 
     const activeAudioContext = audioContextRef.current;
     if (activeAudioContext && activeAudioContext.state !== "closed") {
@@ -128,7 +142,8 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
         const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
         const source = audioCtx.createMediaStreamSource(stream);
         const analyserNode = audioCtx.createAnalyser();
-        analyserNode.fftSize = 256;
+        analyserNode.fftSize = 512;
+        analyserNode.smoothingTimeConstant = 0.7;
         source.connect(analyserNode);
         
         audioContextRef.current = audioCtx;
@@ -152,6 +167,10 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
         };
         mediaRecorder.start();
         setRecorder(mediaRecorder);
+        // Start duration timer
+        durationIntervalRef.current = setInterval(() => {
+          setRecordingDuration(prev => prev + 1);
+        }, 1000);
       })
       .catch(() => {
         setRecording(false);
@@ -172,18 +191,25 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
       const dataArray = new Uint8Array(bufferLength);
       analyser.getByteFrequencyData(dataArray);
 
-      // Create 20 bars from the frequency data
-      const bars = new Array(20);
-      const step = Math.floor(bufferLength / 20);
+      // Create 32 bars from the frequency data - use more of the spectrum
+      const bars = new Array(32);
+      const usableBins = Math.min(bufferLength, 128); // Use lower frequencies (0-4kHz typically)
+      const step = Math.floor(usableBins / 32);
       
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < 32; i++) {
         let sum = 0;
         for (let j = 0; j < step; j++) {
-          sum += dataArray[i * step + j];
+          const index = i * step + j;
+          if (index < bufferLength) {
+            sum += dataArray[index];
+          }
         }
         const average = sum / step;
-        // Map to height between 4px and 32px
-        bars[i] = 4 + (average / 255) * 28;
+        // Exponential scaling for better sensitivity to quiet sounds
+        // Map to height between 4px and 48px with exponential curve
+        const normalized = average / 255;
+        const exponential = Math.pow(normalized, 0.6); // Less than 1 = more sensitive to low values
+        bars[i] = 4 + exponential * 44;
       }
       
       setSpectrumData(bars);
@@ -237,28 +263,14 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
             </div>
           </div>
           <Card className="p-3">
-            <div className={`flex items-center gap-3 ${recording ? '' : 'flex-row-reverse'}`}>
-              {recording && (
-                <div className="flex-1 flex items-center gap-1">
-                  {spectrumData.map((height, i) => (
-                    <div
-                      key={i}
-                      className="bg-blue-500 rounded-full transition-all duration-75"
-                      style={{
-                        width: `${100 / 20 - 1}%`,
-                        height: `${height}px`,
-                        minHeight: '4px',
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
+            <div className="flex items-center justify-between gap-3">
               <Button
                 size="xs"
                 variant={recording ? "destructive" : "outline"}
                 type="button"
                 onClick={() => {
                   if (recording) {
+                    triggerVibration("important");
                     stopRecording();
                     return;
                   }
@@ -270,6 +282,25 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
                 {recording ? <Square size={12} /> : <Mic size={12} />}
                 {recording ? t("stopRecording", locale) : t("recordAudio", locale)}
               </Button>
+              {recording && (
+                <div className="flex-1 flex items-center justify-center gap-[3px] h-6 px-2">
+                  {[0.3, 0.5, 0.7, 0.4, 0.9, 0.6, 0.8, 0.5, 0.7, 0.4, 0.6, 0.8, 0.5, 0.7, 0.4].map((peak, i) => {
+                    const h = 4 + (spectrumData[i % spectrumData.length] / 48) * 20 * peak;
+                    return (
+                      <div
+                        key={i}
+                        className="w-[3px] bg-red-500 rounded-full"
+                        style={{ height: `${Math.max(4, Math.min(20, h))}px` }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+              {recording && (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {formatDuration(recordingDuration)}
+                </span>
+              )}
             </div>
             {recording && <p className="text-xs text-muted-foreground">{t("recording", locale)}</p>}
             {audioUrl && <AudioAnchor src={audioUrl} locale={locale} />}

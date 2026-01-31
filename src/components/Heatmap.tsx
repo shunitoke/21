@@ -29,6 +29,12 @@ const Heatmap = ({
   const [cols, setCols] = useState(28);
   const [cellSize, setCellSize] = useState(10);
   const [gap, setGap] = useState(2);
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const htmlTheme = document.documentElement.getAttribute("data-theme");
+    const htmlAppearance = document.documentElement.getAttribute("data-appearance");
+    return htmlTheme === "dark" || htmlAppearance === "dark";
+  });
   const colorCache = useRef<Map<string, string>>(new Map());
 
   const target = Math.max(1, dailyTarget);
@@ -67,6 +73,19 @@ const Heatmap = ({
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      const htmlTheme = document.documentElement.getAttribute("data-theme");
+      const htmlAppearance = document.documentElement.getAttribute("data-appearance");
+      const dark = htmlTheme === "dark" || htmlAppearance === "dark";
+      setIsDark(dark);
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-appearance"] });
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
@@ -116,23 +135,30 @@ const Heatmap = ({
         intens != null
           ? Math.min(1, Math.max(0, intens))
           : count <= 0
-            ? 0.10
-            : count >= target
-              ? 1
-              : 0.5;
+            ? isDark ? 0.15 : 1
+            : Math.min(1, count / target);
 
-      const cssColor = count <= 0 ? "hsl(var(--muted))" : colorsByDate?.[date] ?? accent;
-      const rgb = resolve(cssColor);
+      const cssColor = count <= 0
+        ? isDark ? "#333" : "#e0e0e0"
+        : colorsByDate?.[date] ?? accent;
+
+      let fillStyle: string;
+      if (count <= 0 && !isDark) {
+        fillStyle = "rgb(240, 240, 240)";
+      } else {
+        const rgb = resolve(cssColor);
+        fillStyle = rgb.replace("rgb", "rgba").replace(")", `, ${opacity})`);
+      }
 
       const col = Math.floor(i / 7);
       const row = i % 7;
       const x = col * (cellSize + gap);
       const y = row * (cellSize + gap);
 
-      ctx.fillStyle = rgb.replace("rgb", "rgba").replace(")", `, ${opacity})`);
+      ctx.fillStyle = fillStyle;
       ctx.fillRect(x, y, cellSize, cellSize);
     }
-  }, [allDates, logMap, colorsByDate, accent, target, cellSize, gap, intensityByDate, width, height]);
+  }, [allDates, logMap, colorsByDate, accent, target, cellSize, gap, intensityByDate, width, height, isDark]);
 
   return (
     <div 

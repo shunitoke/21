@@ -20,6 +20,7 @@ import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { getThemePreference } from "@/services/storage";
 import { InteractiveTutorial } from "@/components/InteractiveTutorial";
 import { Spotlight, useSpotlightTour } from "@/components/Spotlight";
+import { vibrationFeedback } from "@/utils/vibrationUtils";
 
 export default function Home() {
   const [habitModalOpen, setHabitModalOpen] = useState(false);
@@ -447,27 +448,30 @@ export default function Home() {
       }}
     >
       <header className="mb-6 flex items-center justify-between gap-4 overflow-hidden" style={{ maxWidth: '100%', overflowX: 'hidden', minWidth: '0', flexShrink: '1', flexBasis: '0', boxSizing: 'border-box' }}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-baseline gap-3">
           <Button
             type="button"
             size="icon"
             variant="outline"
             aria-label={t("settingsTitle", locale)}
-            onClick={() => setSettingsOpen(true)}
+            onClick={() => {
+              vibrationFeedback.buttonPress();
+              setSettingsOpen(true);
+            }}
             data-tutorial-target="settings"
           >
             <Settings size={16} />
           </Button>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold leading-tight">
+          <h1 className="flex items-center gap-2 text-2xl font-semibold" style={{ lineHeight: '1' }}>
             <span
-              className="text-2xl font-bold italic leading-none sm:text-3xl"
-              style={{ fontFamily: '"Zvezda NHZDN Bold Italic"' }}
+              className="text-2xl font-bold italic sm:text-3xl"
+              style={{ fontFamily: '"Zvezda NHZDN Bold Italic"', lineHeight: '1' }}
             >
               {locale === "ru" ? "Программа" : "Program"}
             </span>
             <span
-              className="text-3xl font-bold italic leading-none sm:text-4xl"
-              style={{ fontFamily: '"Zvezda NHZDN Bold Italic"' }}
+              className="text-3xl font-bold italic sm:text-4xl"
+              style={{ fontFamily: '"Zvezda NHZDN Bold Italic"', lineHeight: '1' }}
             >
               21
             </span>
@@ -493,6 +497,7 @@ export default function Home() {
             variant="default"
             aria-label={t("addHabit", locale)}
             onClick={() => {
+              vibrationFeedback.buttonPress();
               setSelectedHabit(null);
               setHabitModalOpen(true);
             }}
@@ -607,7 +612,10 @@ export default function Home() {
             size="icon-lg"
             variant={background.screen === "home" ? "default" : "ghost"}
             aria-label={t("homeTitle", locale)}
-            onClick={() => setScreenWithDirection("home")}
+            onClick={() => {
+              vibrationFeedback.tabSwitch();
+              setScreenWithDirection("home");
+            }}
             data-tutorial-target="nav-home"
           >
             <HomeIcon size={18} />
@@ -617,7 +625,10 @@ export default function Home() {
             size="icon-lg"
             variant={background.screen === "progress" ? "default" : "ghost"}
             aria-label={t("progressTitle", locale)}
-            onClick={() => setScreenWithDirection("progress")}
+            onClick={() => {
+              vibrationFeedback.tabSwitch();
+              setScreenWithDirection("progress");
+            }}
             data-tutorial-target="nav-progress"
           >
             <LineChart size={18} />
@@ -627,7 +638,10 @@ export default function Home() {
             size="icon-lg"
             variant={background.screen === "practice" ? "default" : "ghost"}
             aria-label={t("practiceTitle", locale)}
-            onClick={() => setScreenWithDirection("practice")}
+            onClick={() => {
+              vibrationFeedback.tabSwitch();
+              setScreenWithDirection("practice");
+            }}
             data-tutorial-target="nav-practice"
           >
             <Sparkles size={18} />
