@@ -6,8 +6,8 @@ import {
   DndContext,
   closestCenter,
   KeyboardSensor,
+  MouseSensor,
   PointerSensor,
-  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -302,14 +302,12 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        delay: 200,
-        tolerance: 8,
+        distance: 8,
       },
     }),
-    useSensor(TouchSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: {
-        delay: 200,
-        tolerance: 8,
+        distance: 8,
       },
     }),
     useSensor(KeyboardSensor, {
