@@ -1,22 +1,13 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import dynamic from "next/dynamic";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Home as HomeIcon, LineChart, Loader2, Plus, Settings, Sparkles } from "lucide-react";
 import HomeScreen from "@/components/screens/HomeScreen";
-const ProgressScreen = dynamic(() => import("@/components/screens/ProgressScreen"), {
-  ssr: false,
-  loading: () => <div className="h-[260px] w-full animate-pulse rounded-3xl bg-muted/50" />,
-});
-const PracticeScreen = dynamic(() => import("@/components/screens/PracticeScreen"), {
-  ssr: false,
-  loading: () => <div className="h-[260px] w-full animate-pulse rounded-3xl bg-muted/50" />,
-});
-const SettingsScreen = dynamic(() => import("@/components/screens/SettingsScreen"), {
-  ssr: false,
-});
+import ProgressScreen from "@/components/screens/ProgressScreen";
+import PracticeScreen from "@/components/screens/PracticeScreen";
+import SettingsScreen from "@/components/screens/SettingsScreen";
 import HabitModal from "@/components/HabitModal";
 import type { Habit, HabitCategoryId, JournalEntry, Locale, StopCraneItem, ThemePreference } from "@/lib/types";
 import { t } from "@/lib/i18n";
@@ -25,6 +16,8 @@ import { getCategoryColor } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { getThemePreference } from "@/services/storage";
 
 export default function Home() {
   const [habitModalOpen, setHabitModalOpen] = useState(false);
@@ -111,11 +104,13 @@ export default function Home() {
       root.dataset.appearance = mode;
     };
 
-    const storedTheme = localStorage.getItem("program21.theme") as ThemePreference | null;
-    const themeToApply = storedTheme ?? settings.theme;
-    applyTheme(themeToApply);
+    // Get theme from IndexedDB
+    getThemePreference().then((storedTheme: string | null) => {
+      const themeToApply = (storedTheme as ThemePreference) ?? settings.theme;
+      applyTheme(themeToApply);
+    });
 
-    if (themeToApply !== "system") return;
+    if (settings.theme !== "system") return;
     const media = window.matchMedia?.("(prefers-color-scheme: dark)");
     const handler = () => applyTheme("system");
     media?.addEventListener?.("change", handler);
@@ -395,12 +390,14 @@ export default function Home() {
     () => ({
       enter: (direction: number) => ({
         x: direction === 0 ? "0%" : direction > 0 ? "100%" : "-100%",
-        opacity: 0,
+        opacity: 1,
+        position: "relative" as const,
       }),
-      center: { x: "0%", opacity: 1 },
+      center: { x: "0%", opacity: 1, position: "relative" as const },
       exit: (direction: number) => ({
         x: direction === 0 ? "0%" : direction > 0 ? "-100%" : "100%",
-        opacity: 0,
+        opacity: 1,
+        position: "absolute" as const,
       }),
     }),
     []
@@ -489,18 +486,18 @@ export default function Home() {
           </Button>
         </div>
       </header>
-      <AnimatePresence
-        mode="wait"
-        initial={false}
-        custom={transitionDir}
-        onExitComplete={() => {
-          if (!pendingScrollResetRef.current) return;
-          pendingScrollResetRef.current = false;
-          const root = document.querySelector<HTMLDivElement>(".app-root");
-          if (root) root.scrollTo({ top: 0, left: 0, behavior: "auto" });
-          window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-        }}
-      >
+      <div style={{ position: "relative", overflow: "hidden", width: "100%" }}>
+        <AnimatePresence
+          initial={true}
+          custom={transitionDir}
+          onExitComplete={() => {
+            if (!pendingScrollResetRef.current) return;
+            pendingScrollResetRef.current = false;
+            const root = document.querySelector<HTMLDivElement>(".app-root");
+            if (root) root.scrollTo({ top: 0, left: 0, behavior: "auto" });
+            window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+          }}
+        >
         <motion.div
           key={background.screen}
           custom={transitionDir}
@@ -511,29 +508,31 @@ export default function Home() {
           className="w-full"
           transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
           drag={background.screen === "home" || background.screen === "progress" || background.screen === "practice" ? "x" : false}
+          dragListener={false}
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.12}
           style={{ touchAction: "pan-y" }}
-          onDragStart={(_, info) => {
+          onPointerDown={(e) => {
+            if (background.screen !== "home" && background.screen !== "progress" && background.screen !== "practice") return;
+            dragStartXRef.current = e.clientX;
             didSwipeRef.current = false;
-            dragStartXRef.current = info.point.x;
           }}
-          onDrag={(_, info) => {
+          onPointerMove={(e) => {
             if (dragStartXRef.current === null) return;
-            if (Math.abs(info.point.x - dragStartXRef.current) > 10) {
-              didSwipeRef.current = true;
-            }
+            const dx = e.clientX - dragStartXRef.current;
+            if (Math.abs(dx) > 10) didSwipeRef.current = true;
           }}
-          onDragEnd={(_, info) => {
-            if (hasDialogOverlay) return;
-            const offset = info.offset.x;
-            const velocity = info.velocity.x;
-            if (offset < -60 || velocity < -600) {
+          onPointerUp={(e) => {
+            if (dragStartXRef.current === null) return;
+            if (hasDialogOverlay) {
+              dragStartXRef.current = null;
+              return;
+            }
+            const dx = e.clientX - dragStartXRef.current;
+            if (dx < -60) {
               handleSwipe(1);
-              didSwipeRef.current = true;
-            } else if (offset > 60 || velocity > 600) {
+            } else if (dx > 60) {
               handleSwipe(-1);
-              didSwipeRef.current = true;
             }
             dragStartXRef.current = null;
           }}
@@ -583,6 +582,7 @@ export default function Home() {
           )}
         </motion.div>
       </AnimatePresence>
+      </div>
       <audio ref={radioAudioRef} preload="none" />
       <nav className="fixed inset-x-0 bottom-4 z-40 flex justify-center">
         <div className="flex items-center gap-3 rounded-full border border-border/60 bg-background/80 px-4 py-3 shadow-lg backdrop-blur-md">
@@ -657,6 +657,7 @@ export default function Home() {
           {toast}
         </button>
       )}
+      <PWAInstallPrompt />
     </div>
   );
 }

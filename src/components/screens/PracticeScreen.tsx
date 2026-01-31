@@ -1,6 +1,27 @@
 "use client";
 
-import { motion, useDragControls } from "framer-motion";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+  DragOverlay,
+  defaultDropAnimationSideEffects,
+  type DropAnimation,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ChevronDown, ChevronUp, Filter, GripVertical, Moon, Pause, Play, Sun, Trash2, X } from "lucide-react";
@@ -294,11 +315,9 @@ const PracticeScreen = ({
           size="icon-sm"
           type="button"
           onPointerDown={(event) => {
-            event.preventDefault();
             event.stopPropagation();
           }}
           onTouchStart={(event) => {
-            event.preventDefault();
             event.stopPropagation();
           }}
           onClick={(event) => {
@@ -524,138 +543,91 @@ const PracticeScreen = ({
     if (imagePointersRef.current.size === 0) imagePanRef.current = null;
   };
 
-  const swapAnchors = (fromIndex: number, toIndex: number) => {
-    if (toIndex < 0 || toIndex >= orderedStopCrane.length || fromIndex === toIndex) return;
-    const next = [...orderedStopCrane];
-    [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
-    setOrderedStopCrane(next);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleAnchorDragStart = useCallback((event: DragStartEvent) => {
+    setActiveAnchorId(event.active.id as string);
+    document.body.style.overflow = "hidden";
+    vibrationFeedback.dragStart();
+  }, []);
+
+  const handleAnchorDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveAnchorId(null);
+    document.body.style.overflow = "";
+
+    if (over && active.id !== over.id) {
+      const oldIndex = orderedStopCrane.findIndex((item) => item.id === active.id);
+      const newIndex = orderedStopCrane.findIndex((item) => item.id === over.id);
+      const newOrder = arrayMove(orderedStopCrane, oldIndex, newIndex);
+      setOrderedStopCrane(newOrder);
+      
+      const ids = newOrder.map((item) => item.id);
+      const currentIds = stopCrane.map((item) => item.id);
+      if (ids.join("|") !== currentIds.join("|")) {
+        onReorderStopCrane(newOrder);
+      }
+      
+      vibrationFeedback.dropSuccess();
+    }
+  }, [orderedStopCrane, stopCrane, onReorderStopCrane]);
+
+  const dropAnimation: DropAnimation = {
+    sideEffects: defaultDropAnimationSideEffects({
+      styles: {
+        active: {
+          opacity: "0",
+        },
+      },
+    }),
   };
 
-  const getSwapIndex = (index: number, offset: { x: number; y: number }) => {
-    const threshold = 48;
-    const col = index % 2;
-    if (Math.abs(offset.x) > Math.abs(offset.y) && Math.abs(offset.x) > threshold) {
-      if (offset.x < 0 && col === 1) return index - 1;
-      if (offset.x > 0 && col === 0 && index + 1 < orderedStopCrane.length) return index + 1;
-    }
-    if (Math.abs(offset.y) > threshold) {
-      if (offset.y < 0) return index - 2;
-      if (offset.y > 0) return index + 2;
-    }
-    return index;
-  };
+  const [activeAnchorId, setActiveAnchorId] = useState<string | null>(null);
 
-  const AnchorReorderItem = ({ item }: { item: StopCraneItem }) => {
-    const dragControls = useDragControls();
-    const wobbleIndex = orderedStopCrane.findIndex((anchor) => anchor.id === item.id);
-    const holdTimeoutRef = useRef<number | null>(null);
-    const pressPointRef = useRef<{ x: number; y: number } | null>(null);
-    const pointerEventRef = useRef<globalThis.PointerEvent | null>(null);
-    const [dragActive, setDragActive] = useState(false);
+  const SortableAnchorItem = ({ item }: { item: StopCraneItem }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: item.id });
 
-    const clearHoldTimeout = () => {
-      if (holdTimeoutRef.current) {
-        window.clearTimeout(holdTimeoutRef.current);
-        holdTimeoutRef.current = null;
-      }
-    };
-
-    const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-      clearHoldTimeout();
-      pressPointRef.current = { x: event.clientX, y: event.clientY };
-      pointerEventRef.current = event.nativeEvent as globalThis.PointerEvent;
-      event.currentTarget.setPointerCapture(event.pointerId);
-      holdTimeoutRef.current = window.setTimeout(() => {
-        if (pointerEventRef.current) {
-          setDragActive(true);
-          dragControls.start(pointerEventRef.current);
-        }
-      }, 180);
-    };
-
-    const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (!pressPointRef.current) return;
-      const dx = Math.abs(event.clientX - pressPointRef.current.x);
-      const dy = Math.abs(event.clientY - pressPointRef.current.y);
-      if (dx > 8 || dy > 8) {
-        clearHoldTimeout();
-        pressPointRef.current = null;
-        pointerEventRef.current = null;
-        setDragActive(false);
-      }
-    };
-
-    const handlePointerEnd = () => {
-      clearHoldTimeout();
-      pressPointRef.current = null;
-      pointerEventRef.current = null;
-      setDragActive(false);
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      zIndex: isDragging ? 9999 : 1,
+      position: "relative" as const,
+      opacity: isDragging ? 0 : 1,
     };
 
     return (
-      <motion.div
-        key={item.id}
-        layout
-        drag
-        dragControls={dragControls}
-        dragListener={false}
-        dragElastic={0.08}
-        dragMomentum={false}
-        dragConstraints={anchorGridRef}
-        dragSnapToOrigin
-        style={
-          anchorWobbleActive
-            ? {
-                touchAction: dragActive ? "none" : "pan-y",
-                width: "100%",
-                animationDelay: `${Math.max(0, wobbleIndex) * 60}ms`,
-              }
-            : { touchAction: dragActive ? "none" : "pan-y", width: "100%" }
-        }
-        whileDrag={{ scale: 1.03, boxShadow: "0 16px 38px rgba(0,0,0,0.22)", cursor: "grabbing", zIndex: 20 }}
-        transition={{ type: "spring", stiffness: 540, damping: 38 }}
-        className={`grid gap-2 ${anchorWobbleActive ? "animate-anchor-wobble" : ""}`}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerEnd}
-        onPointerCancel={handlePointerEnd}
-        onPointerLeave={handlePointerEnd}
-        onDragStart={() => {
-          triggerAnchorWobble();
-          blockClick();
-          vibrationFeedback.dragStart();
-          const currentIndex = orderedStopCrane.findIndex((anchor) => anchor.id === item.id);
-          lastSwapIndexRef.current = currentIndex === -1 ? null : currentIndex;
-        }}
-        onDrag={(_, info) => {
-          const currentIndex = orderedStopCrane.findIndex((anchor) => anchor.id === item.id);
-          if (currentIndex === -1) return;
-          const targetIndex = getSwapIndex(currentIndex, info.offset);
-          if (targetIndex === currentIndex) return;
-          if (lastSwapIndexRef.current === targetIndex) return;
-          swapAnchors(currentIndex, targetIndex);
-          lastSwapIndexRef.current = targetIndex;
-        }}
-        onDragEnd={(_, info) => {
-          blockClick();
-          vibrationFeedback.dropSuccess();
-          setDragActive(false);
-          const currentIndex = orderedStopCrane.findIndex((anchor) => anchor.id === item.id);
-          const targetIndex = currentIndex === -1 ? -1 : getSwapIndex(currentIndex, info.offset);
-          if (currentIndex !== -1 && targetIndex !== currentIndex) {
-            swapAnchors(currentIndex, targetIndex);
-          }
-          commitAnchorOrder(orderedStopCrane);
-          lastSwapIndexRef.current = null;
-        }}
-      >
-        <Card className="transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0">
+      <div ref={setNodeRef} style={style} className={`grid gap-2 ${anchorWobbleActive ? "animate-anchor-wobble" : ""}`}>
+        <Card 
+          className="transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
+          style={{
+            boxShadow: isDragging ? "0 25px 50px rgba(0,0,0,0.35)" : "0 4px 12px rgba(0,0,0,0.08)",
+          }}
+        >
           <CardContent className="grid gap-3 px-3">
             <div className="flex items-center justify-between">
               <button
                 type="button"
                 className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground"
                 aria-label={t("drag", locale)}
+                style={{ touchAction: "none" }}
+                {...attributes}
+                {...listeners}
               >
                 <GripVertical size={14} />
                 {item.type}
@@ -664,10 +636,8 @@ const PracticeScreen = ({
                 size="icon-sm"
                 variant="outline"
                 type="button"
-                onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation();
-                  if (dragBlockRef.current) return;
                   setAnchorToDelete(item);
                 }}
                 aria-label={t("delete", locale)}
@@ -683,10 +653,8 @@ const PracticeScreen = ({
               <button
                 type="button"
                 className="overflow-hidden rounded-lg"
-                onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation();
-                  if (dragBlockRef.current) return;
                   setImagePreview(item.content);
                 }}
               >
@@ -701,11 +669,9 @@ const PracticeScreen = ({
             ) : item.type === "stop" ? (
               <button
                 type="button"
-                className="group relative mx-auto flex h-[96px] w-[96px] items-center justify-center overflow-hidden rounded-full border border-red-700/40 bg-gradient-to-b from-red-500 via-red-600 to-red-700 shadow-[0_12px_24px_rgba(127,29,29,0.35),inset_0_2px_6px_rgba(255,255,255,0.3),inset_0_-6px_10px_rgba(0,0,0,0.22)] transition-transform active:translate-y-[2px]"
-                onPointerDown={(event) => event.stopPropagation()}
+                className={`group relative mx-auto flex h-[96px] w-[96px] items-center justify-center overflow-hidden rounded-full border border-red-700/40 bg-gradient-to-b from-red-500 via-red-600 to-red-700 shadow-[0_12px_24px_rgba(127,29,29,0.35),inset_0_2px_6px_rgba(255,255,255,0.3),inset_0_-6px_10px_rgba(0,0,0,0.22)] transition-transform active:translate-y-[2px] ${anchorWobbleActive ? "animate-anchor-wobble" : ""}`}
                 onClick={(event) => {
                   event.stopPropagation();
-                  if (dragBlockRef.current) return;
                   setBreathingOpen(true);
                 }}
               >
@@ -723,10 +689,8 @@ const PracticeScreen = ({
               <button
                 type="button"
                 className="text-left"
-                onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation();
-                  if (dragBlockRef.current) return;
                   if (item.type === "link") {
                     window.open(item.content, "_blank", "noopener,noreferrer");
                     return;
@@ -742,9 +706,11 @@ const PracticeScreen = ({
             )}
           </CardContent>
         </Card>
-      </motion.div>
+      </div>
     );
   };
+
+  const activeAnchorItem = activeAnchorId ? orderedStopCrane.find((item) => item.id === activeAnchorId) : null;
 
   return (
     <div className="grid gap-6">
@@ -761,17 +727,61 @@ const PracticeScreen = ({
           {orderedStopCrane.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("pinAnchorsEmpty", locale)}</p>
           ) : (
-            <div
-              ref={anchorGridRef}
-              className="relative grid grid-cols-2 gap-3 pb-2"
-              onPointerDown={(event) => event.stopPropagation()}
-              onTouchStart={(event) => event.stopPropagation()}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleAnchorDragStart}
+              onDragEnd={handleAnchorDragEnd}
             >
-              {orderedStopCrane.map((item) => (
-                <AnchorReorderItem key={item.id} item={item} />
-              ))}
-            </div>
-        )}
+              <SortableContext items={orderedStopCrane.map(item => item.id)} strategy={rectSortingStrategy}>
+                <div
+                  ref={anchorGridRef}
+                  className="relative grid grid-cols-2 gap-3 pb-2"
+                  style={{ contain: 'layout paint style' }}
+                >
+                  {orderedStopCrane.map((item) => (
+                    <SortableAnchorItem key={item.id} item={item} />
+                  ))}
+                </div>
+              </SortableContext>
+              <DragOverlay dropAnimation={dropAnimation}>
+                {activeAnchorItem ? (
+                  <Card
+                    style={{
+                      boxShadow: "0 25px 50px rgba(0,0,0,0.4)",
+                      transform: "scale(1.03)",
+                    }}
+                  >
+                    <CardContent className="grid gap-3 px-3">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+                          <GripVertical size={14} />
+                          {activeAnchorItem.type}
+                        </span>
+                      </div>
+                      {activeAnchorItem.type === "image" ? (
+                        <div className="overflow-hidden rounded-lg">
+                          <img
+                            src={imageThumbs[activeAnchorItem.id] ?? activeAnchorItem.content}
+                            alt=""
+                            className="h-40 w-full object-cover"
+                          />
+                        </div>
+                      ) : activeAnchorItem.type === "stop" ? (
+                        <div className="group relative mx-auto flex h-[96px] w-[96px] items-center justify-center overflow-hidden rounded-full border border-red-700/40 bg-gradient-to-b from-red-500 via-red-600 to-red-700">
+                          <span className="text-[24px] font-black text-white">STOP</span>
+                        </div>
+                      ) : (
+                        <p className="text-sm leading-snug break-words line-clamp-3">
+                          {activeAnchorItem.content}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          )}
         </CardContent>
       </Card>
 
@@ -804,7 +814,7 @@ const PracticeScreen = ({
           {journal.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("noEntriesYet", locale)}</p>
           ) : (
-            <div className="grid gap-3">
+            <div className="grid gap-3" style={{ contain: 'layout paint' }}>
               {pagedJournal.map((entry) => (
                 <JournalEntryCard
                   key={entry.id}
@@ -1086,7 +1096,7 @@ const PracticeScreen = ({
             <div className="relative z-0 flex flex-1 flex-col items-center justify-center">
               <motion.div
                 className="relative grid place-items-center transform-gpu"
-                style={{ willChange: "transform" }}
+                style={{ willChange: "transform", contain: 'layout style' }}
                 animate={{
                   scale: breathingPhase === "inhale" ? 1.18 : breathingPhase === "exhale" ? 0.82 : 1.02,
                 }}

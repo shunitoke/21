@@ -64,49 +64,6 @@ const usePageVisibility = () => {
   return isVisible;
 };
 
-const useIdleRender = (enabled = true, delay = 300) => {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    if (!enabled) {
-      setReady(false);
-      return;
-    }
-
-    const requestIdle =
-      typeof window !== "undefined"
-        ? (window as Window & {
-            requestIdleCallback?: (cb: IdleRequestCallback, options?: IdleRequestOptions) => number;
-            cancelIdleCallback?: (handle: number) => void;
-          }).requestIdleCallback
-        : undefined;
-    const cancelIdle =
-      typeof window !== "undefined"
-        ? (window as Window & {
-            cancelIdleCallback?: (handle: number) => void;
-          }).cancelIdleCallback
-        : undefined;
-
-    let handle: number | null = null;
-    if (requestIdle) {
-      handle = requestIdle(() => setReady(true), { timeout: 700 });
-    } else {
-      handle = window.setTimeout(() => setReady(true), delay);
-    }
-
-    return () => {
-      if (handle === null) return;
-      if (requestIdle && cancelIdle) {
-        cancelIdle(handle);
-      } else {
-        clearTimeout(handle);
-      }
-    };
-  }, [enabled, delay]);
-
-  return ready;
-};
-
 const useCountUp = (value: number, duration = 900, enabled = true) => {
   const [displayValue, setDisplayValue] = useState(0);
   const latestValueRef = useRef(0);
@@ -277,7 +234,6 @@ const renderJournalIcon = (cx: number, cy: number, entries: JournalEntry[], onCl
 
 const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive = true }: ProgressScreenProps) => {
   const isPageVisible = usePageVisibility();
-  const isChartReady = useIdleRender(isActive);
   const [chartMode, setChartMode] = useState<"week" | "month" | "year">("week");
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [showJournalEntries, setShowJournalEntries] = useState(true);
@@ -403,9 +359,9 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
     });
   }, [baseDays, filteredHabits, logsByDate]);
 
-  const averageIntensity = dailyIntensity.length
+  const averageIntensity = useMemo(() => dailyIntensity.length
     ? dailyIntensity.reduce((sum, value) => sum + value, 0) / dailyIntensity.length
-    : 0;
+    : 0, [dailyIntensity]);
   const completionRateRaw = averageIntensity * 100;
   const completionRate = Math.round(completionRateRaw);
 
@@ -1146,7 +1102,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
               opts={{ align: "start", loop: true, watchDrag: false, watchSlides: false }}
               setApi={setMetricsCarouselApi}
               className="relative max-w-full overflow-hidden"
-              style={{ touchAction: 'pan-y' }}
+              style={{ touchAction: 'pan-y', contain: 'layout paint' }}
             >
               <CarouselContent className="max-w-full">
                 {carouselMetrics.map((metric, index) => (
@@ -1201,7 +1157,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
               opts={{ align: "start", loop: true, watchDrag: false, watchSlides: false }}
               setApi={setMetricsCarouselApi}
               className="relative max-w-full overflow-hidden"
-              style={{ touchAction: 'pan-y' }}
+              style={{ touchAction: 'pan-y', contain: 'layout paint' }}
             >
               <CarouselContent className="max-w-full">
                 {carouselMetrics.map((metric, index) => (
@@ -1324,9 +1280,8 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
                 {t("journal", locale)}
               </Button>
             </div>
-            <div className="overflow-hidden" style={{ touchAction: 'pan-y' }}>
-              {isChartReady ? (
-                <ChartContainer config={chartConfig} className="h-[200px] w-full" style={{ touchAction: 'pan-y' }}>
+            <div className="overflow-hidden" style={{ touchAction: 'pan-y', contain: 'layout paint' }}>
+              <ChartContainer config={chartConfig} className="h-[200px] w-full" style={{ touchAction: 'pan-y' }}>
                   <ComposedChart data={chartDataWithHandlers} margin={{ top: 28, left: 12, right: 12, bottom: 6 }}>
                     <CartesianGrid vertical={false} />
                     <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
@@ -1350,9 +1305,6 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
                     ))}
                   </ComposedChart>
                 </ChartContainer>
-              ) : (
-                <Skeleton className="h-[200px] w-full" />
-              )}
             </div>
           </div>
 
@@ -1378,7 +1330,6 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
                         className="relative overflow-hidden"
                         style={{ maxWidth: "96px", overflowX: "hidden", minWidth: "96px", width: "96px" }}
                       >
-                        {isChartReady ? (
                           <ChartContainer
                             config={chartConfig}
                             className="aspect-square w-[96px]"
@@ -1390,9 +1341,6 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
                               <RadialBar dataKey="value" background cornerRadius={8} />
                             </RadialBarChart>
                           </ChartContainer>
-                        ) : (
-                          <Skeleton className="h-[96px] w-[96px]" />
-                        )}
                         <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-semibold text-foreground">
                           <CountUpValue key={`rhythm-${metricsAnimationKey}`} value={completionRate} suffix="%" enabled={metricAnimationEnabled} />
                         </span>
@@ -1436,7 +1384,7 @@ const ProgressScreen = ({ locale, habits, logs, achievements, journal, isActive 
             <p className="text-xs text-muted-foreground">{t("noUnlockedAchievements", locale)}</p>
           ) : (
             <Collapsible open={showAllAchievements} onOpenChange={setShowAllAchievements}>
-              <div className="grid gap-4">
+              <div className="grid gap-4" style={{ contain: 'layout' }}>
                 {achievementGroupOrder.map((group) => {
                   const items = visibleGroupedBuckets[group];
                   if (!items?.length) return null;

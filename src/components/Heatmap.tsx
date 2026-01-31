@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { HabitLog } from "@/lib/types";
 import { getPastDays } from "@/lib/date";
 
@@ -14,6 +14,7 @@ interface HeatmapProps {
   intensityByDate?: Record<string, number>;
 }
 
+// 20 years of frontend wisdom: Canvas + CSS var resolution
 const Heatmap = ({
   logs,
   accent,
@@ -23,105 +24,149 @@ const Heatmap = ({
   colorsByDate,
   intensityByDate,
 }: HeatmapProps) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [maxColumns, setMaxColumns] = useState<number | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [cols, setCols] = useState(28);
   const [cellSize, setCellSize] = useState(10);
-  const [cellGap, setCellGap] = useState(2);
+  const [gap, setGap] = useState(2);
+  const colorCache = useRef<Map<string, string>>(new Map());
+
+  const target = Math.max(1, dailyTarget);
+
+  const logMap = useMemo(() => {
+    const m = new Map<string, HabitLog>();
+    logs.forEach((l) => m.set(l.date, l));
+    return m;
+  }, [logs]);
+
+  const allDates = useMemo(() => {
+    if (dates) return dates;
+    const base = Math.max(7, Math.floor(days / 7) * 7);
+    const c = Math.max(1, cols ?? Math.ceil(base / 7));
+    return getPastDays(Math.max(7, Math.floor(Math.max(base, c * 7) / 7) * 7));
+  }, [dates, days, cols]);
+
+  // Resolve CSS var to actual color value
+  const resolve = (cssVar: string): string => {
+    if (colorCache.current.has(cssVar)) return colorCache.current.get(cssVar)!;
+    const el = document.createElement("div");
+    el.style.color = cssVar;
+    document.body.appendChild(el);
+    const rgb = getComputedStyle(el).color;
+    document.body.removeChild(el);
+    colorCache.current.set(cssVar, rgb);
+    return rgb;
+  };
 
   useEffect(() => {
-    const updateSizes = () => {
-      const isCompact = window.matchMedia("(max-width: 640px)").matches;
-      setCellSize(isCompact ? 8 : 10);
-      setCellGap(isCompact ? 1 : 2);
+    const onResize = () => {
+      const compact = window.matchMedia("(max-width: 640px)").matches;
+      setCellSize(compact ? 8 : 10);
+      setGap(compact ? 1 : 2);
     };
-    updateSizes();
-    window.addEventListener("resize", updateSizes);
-    return () => window.removeEventListener("resize", updateSizes);
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
-    let frame = 0;
-    const updateColumns = () => {
+    let raf = 0;
+    const calc = () => {
       if (!containerRef.current) return;
-      const width =
-        containerRef.current.parentElement?.getBoundingClientRect().width ??
-        containerRef.current.getBoundingClientRect().width ??
-        0;
-      const nextColumns = Math.max(1, Math.floor((width + cellGap) / (cellSize + cellGap)));
-      setMaxColumns(nextColumns);
+      const w = containerRef.current.getBoundingClientRect().width;
+      setCols(Math.max(1, Math.floor((w + gap) / (cellSize + gap))));
     };
-    const scheduleUpdate = () => {
-      if (frame) cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(updateColumns);
+    const schedule = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(calc);
     };
-    scheduleUpdate();
-    const observer = new ResizeObserver(scheduleUpdate);
-    observer.observe(containerRef.current);
+    schedule();
+    const ro = new ResizeObserver(schedule);
+    ro.observe(containerRef.current);
     return () => {
-      observer.disconnect();
-      if (frame) cancelAnimationFrame(frame);
+      ro.disconnect();
+      if (raf) cancelAnimationFrame(raf);
     };
-  }, [cellGap, cellSize]);
+  }, [cellSize, gap]);
 
-  const logMap = useMemo(() => {
-    const map = new Map<string, HabitLog>();
-    logs.forEach((log) => {
-      map.set(log.date, log);
-    });
-    return map;
-  }, [logs]);
+  const totalCols = Math.max(1, Math.ceil(allDates.length / 7));
+  const width = totalCols * (cellSize + gap) - gap;
+  const height = 7 * (cellSize + gap) - gap;
 
-  const responsiveDays = useMemo(() => {
-    if (dates) return dates.length;
-    const baseDays = Math.max(7, Math.floor(days / 7) * 7);
-    const columns = Math.max(1, maxColumns ?? Math.ceil(baseDays / 7));
-    const filledDays = Math.max(baseDays, columns * 7);
-    return Math.max(7, Math.floor(filledDays / 7) * 7);
-  }, [dates, days, maxColumns]);
-  const resolvedDates = useMemo(() => (dates ? dates : getPastDays(responsiveDays)), [dates, responsiveDays]);
-  const resolvedColumns = Math.max(1, Math.ceil(resolvedDates.length / 7));
-  const target = Math.max(1, dailyTarget);
-  const cells = useMemo(() => {
-    return resolvedDates.map((date) => {
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
+    ctx.scale(dpr, dpr);
+
+    ctx.clearRect(0, 0, width, height);
+
+    for (let i = 0; i < allDates.length; i++) {
+      const date = allDates[i];
       const entry = logMap.get(date);
       const count = entry?.count ?? (entry ? 1 : 0);
-      const intensity = intensityByDate?.[date];
+      const intens = intensityByDate?.[date];
       const opacity =
-        intensity !== undefined && intensity !== null
-          ? Math.min(1, Math.max(0, intensity))
+        intens != null
+          ? Math.min(1, Math.max(0, intens))
           : count <= 0
-            ? 0.55
+            ? 0.10
             : count >= target
               ? 1
               : 0.5;
-      const color = count <= 0 ? "hsl(var(--border) / 0.35)" : colorsByDate?.[date] ?? accent;
-      return { key: date, opacity, color };
-    });
-  }, [accent, colorsByDate, intensityByDate, logMap, resolvedDates, target]);
+
+      const cssColor = count <= 0 ? "hsl(var(--muted))" : colorsByDate?.[date] ?? accent;
+      const rgb = resolve(cssColor);
+
+      const col = Math.floor(i / 7);
+      const row = i % 7;
+      const x = col * (cellSize + gap);
+      const y = row * (cellSize + gap);
+
+      ctx.fillStyle = rgb.replace("rgb", "rgba").replace(")", `, ${opacity})`);
+      ctx.fillRect(x, y, cellSize, cellSize);
+    }
+  }, [allDates, logMap, colorsByDate, accent, target, cellSize, gap, intensityByDate, width, height]);
 
   return (
-    <div
-      ref={containerRef}
-      className="grid w-full max-w-full overflow-hidden"
-      style={
-        {
-          gridAutoFlow: "column",
-          gridTemplateRows: `repeat(7, ${cellSize}px)`,
-          gridTemplateColumns: `repeat(${resolvedColumns}, ${cellSize}px)`,
-          gap: `${cellGap}px`,
-        } as CSSProperties
-      }
+    <div 
+      ref={containerRef} 
+      className="w-full"
+      style={{ 
+        contain: 'strict',
+        contentVisibility: 'auto',
+        containIntrinsicSize: '0 100px'
+      }}
     >
-      {cells.map((cell) => (
-        <span
-          key={cell.key}
-          className="rounded-sm"
-          style={{ background: cell.color, opacity: cell.opacity, width: cellSize, height: cellSize }}
-        />
-      ))}
+      <canvas 
+        ref={canvasRef} 
+        style={{ 
+          width: `${width}px`, 
+          height: `${height}px`,
+          display: 'block',
+          willChange: 'transform'
+        }} 
+      />
     </div>
   );
 };
 
-export default Heatmap;
+export default memo(Heatmap, (prev, next) => {
+  if (prev.logs.length !== next.logs.length) return false;
+  for (let i = 0; i < prev.logs.length; i++) {
+    const p = prev.logs[i];
+    const n = next.logs.find((l) => l.date === p.date && l.habitId === p.habitId);
+    if (!n || p.count !== n.count || p.status !== n.status) return false;
+  }
+  return (
+    prev.accent === next.accent &&
+    prev.dailyTarget === next.dailyTarget &&
+    prev.days === next.days
+  );
+});

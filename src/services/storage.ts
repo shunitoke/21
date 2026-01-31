@@ -4,9 +4,12 @@ import { createKeyMaterial, decryptString, encryptString, exportKey, getKeyFromB
 
 const DB_NAME = "program-21";
 const STORE_NAME = "state";
+const META_STORE_NAME = "meta";
 const STATE_KEY = "app";
 export const DEMO_STATE_KEY = "demo";
-const KEY_STORAGE = "program21.encryptionKey";
+const THEME_KEY = "theme";
+const ENCRYPTION_KEY_STORAGE = "program21.encryptionKey";
+const LEGACY_KEY_STORAGE = "program21.encryptionKey";
 
 const journalEncryptionCache = new Map<string, { hash: string; encryptedContent: string }>();
 let lastKeySerialized: string | null = null;
@@ -35,17 +38,73 @@ export interface PersistedState {
 
 type StoredValue = PersistedState | { key: string; value: PersistedState };
 
+interface MetaStore {
+  theme: string;
+  encryptionKey: string;
+}
+
 const getDb = () =>
-  openDB<{ [STORE_NAME]: StoredValue }>(DB_NAME, 1, {
-    upgrade(db) {
+  openDB<{ [STORE_NAME]: StoredValue; [META_STORE_NAME]: MetaStore }>(DB_NAME, 2, {
+    upgrade(db, oldVersion) {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME);
+      }
+      if (!db.objectStoreNames.contains(META_STORE_NAME)) {
+        db.createObjectStore(META_STORE_NAME);
+      }
+      // Migration: move theme from localStorage to IndexedDB
+      if (oldVersion < 2) {
+        try {
+          const legacyTheme = localStorage.getItem("program21.theme");
+          if (legacyTheme) {
+            const tx = db.transaction(META_STORE_NAME, "readwrite");
+            tx.store.put(legacyTheme, THEME_KEY);
+            // Clean up localStorage after migration
+            localStorage.removeItem("program21.theme");
+          }
+        } catch {
+          // ignore
+        }
       }
     },
   });
 
+export const getThemePreference = async (): Promise<string | null> => {
+  const db = await getDb();
+  const theme = await db.get(META_STORE_NAME, THEME_KEY);
+  return theme ?? null;
+};
+
+export const saveThemePreference = async (theme: string): Promise<void> => {
+  const db = await getDb();
+  await db.put(META_STORE_NAME, theme, THEME_KEY);
+  // Also set cookie for SSR
+  try {
+    document.cookie = `program21.theme=${theme}; path=/; max-age=31536000`;
+  } catch {
+    // ignore
+  }
+};
+
 export const getEncryptionKey = async () => {
-  const existing = localStorage.getItem(KEY_STORAGE);
+  const db = await getDb();
+  let existing = await db.get(META_STORE_NAME, ENCRYPTION_KEY_STORAGE);
+  
+  // Migration: check localStorage for legacy key
+  if (!existing) {
+    try {
+      const legacyKey = localStorage.getItem(LEGACY_KEY_STORAGE);
+      if (legacyKey) {
+        await db.put(META_STORE_NAME, legacyKey, ENCRYPTION_KEY_STORAGE);
+        existing = legacyKey;
+        // Clean up localStorage after migration
+        localStorage.removeItem(LEGACY_KEY_STORAGE);
+      }
+    } catch {
+      // ignore
+    }
+  }
+  
   if (existing && existing !== lastKeySerialized) {
     journalEncryptionCache.clear();
     lastKeySerialized = existing;
@@ -56,7 +115,7 @@ export const getEncryptionKey = async () => {
   const material = createKeyMaterial();
   const key = await importKey(material);
   const exported = await exportKey(key);
-  localStorage.setItem(KEY_STORAGE, exported);
+  await db.put(META_STORE_NAME, exported, ENCRYPTION_KEY_STORAGE);
   if (exported !== lastKeySerialized) {
     journalEncryptionCache.clear();
     lastKeySerialized = exported;

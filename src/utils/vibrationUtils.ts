@@ -12,11 +12,29 @@ export const vibrationPatterns = {
   discipline: [60, 50, 60],
 } as const;
 
+// Флаг для отслеживания первого взаимодействия пользователя
+let hasUserInteracted = typeof window !== "undefined" ? true : false;
+
+// Устанавливаем флаг при первом взаимодействии
+if (typeof window !== "undefined") {
+  const setInteracted = () => {
+    hasUserInteracted = true;
+  };
+  window.addEventListener("pointerdown", setInteracted);
+  window.addEventListener("touchstart", setInteracted);
+  window.addEventListener("keydown", setInteracted);
+}
+
 export const triggerVibration = (pattern: keyof typeof vibrationPatterns | number[]) => {
   if (!navigator.vibrate) return;
+  if (!hasUserInteracted) return; // Браузер блокирует вибрацию без user gesture
 
   const vibrationPattern = typeof pattern === "string" ? vibrationPatterns[pattern] : pattern;
-  navigator.vibrate(vibrationPattern);
+  try {
+    navigator.vibrate(vibrationPattern);
+  } catch (e) {
+    // Игнорируем ошибки вибрации
+  }
 };
 
 export const vibrationFeedback = {

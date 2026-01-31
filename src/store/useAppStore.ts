@@ -8,7 +8,7 @@ import type {
   StopCraneItem,
   UserSettings,
 } from "@/lib/types";
-import { DEMO_STATE_KEY, loadState, saveState } from "@/services/storage";
+import { DEMO_STATE_KEY, loadState, saveState, saveThemePreference } from "@/services/storage";
 import {
   defaultHabits,
   defaultJournal,
@@ -86,12 +86,7 @@ const schedulePersistState = (
 };
 
 const persistThemePreference = (theme: UserSettings["theme"]) => {
-  try {
-    localStorage.setItem("program21.theme", theme);
-    document.cookie = `program21.theme=${theme}; path=/; max-age=31536000`;
-  } catch {
-    // ignore
-  }
+  void saveThemePreference(theme);
 };
 
 const computeAchievements = (habits: Habit[], logs: HabitLog[], journal: JournalEntry[] = []): Achievement[] => {

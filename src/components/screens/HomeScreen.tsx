@@ -1,8 +1,28 @@
 "use client";
 
-import { Reorder, useDragControls } from "framer-motion";
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { Check, Flame, Plus, Star, Tag } from "lucide-react";
+import { memo, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+  DragOverlay,
+  defaultDropAnimationSideEffects,
+  type DropAnimation,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { Check, Flame, Plus, Star, Tag, GripVertical } from "lucide-react";
 import type { Habit, HabitLog, Locale } from "@/lib/types";
 import { t } from "@/lib/i18n";
 import { getTodayISO } from "@/lib/date";
@@ -39,45 +59,199 @@ const getShakeClass = (shake?: "step" | "complete" | "reset" | null) => {
   return "";
 };
 
+// Стабильный пустой массив для предотвращения лишних рендеров
+const EMPTY_LOGS: HabitLog[] = [];
+
 const buildLogsByHabit = (logs: HabitLog[]) => {
   const map = new Map<string, HabitLog[]>();
   logs.forEach((log) => {
-    const list = map.get(log.habitId) ?? [];
-    list.push(log);
-    map.set(log.habitId, list);
+    const existing = map.get(log.habitId);
+    if (existing) {
+      map.set(log.habitId, [...existing, log]);
+    } else {
+      map.set(log.habitId, [log]);
+    }
   });
   return map;
 };
 
-const getToggleState = (log: HabitLog | undefined, target: number) => {
-  const currentCount = log ? log.count ?? 1 : 0;
-  let nextCount = 0;
-  let nextShake: "step" | "complete" | "reset" = "step";
+interface SortableHabitCardProps {
+  habit: Habit;
+  habitLogs: HabitLog[];
+  locale: Locale;
+  isDragging: boolean;
+  onToggle: (habitId: string, isPriority: boolean, dailyTarget?: number) => void;
+  onOpen: (habit: Habit) => void;
+  shakeClass: string;
+  setShakeMap: (updater: (prev: Record<string, "step" | "complete" | "reset" | null>) => Record<string, "step" | "complete" | "reset" | null>) => void;
+}
 
-  if (!log) {
-    nextCount = 1;
-  } else if (currentCount >= target) {
-    nextCount = 0;
-    nextShake = "reset";
-  } else {
-    nextCount = currentCount + 1;
+const SortableHabitCard = memo(function SortableHabitCard({
+  habit,
+  habitLogs,
+  locale,
+  isDragging,
+  onToggle,
+  onOpen,
+  shakeClass,
+  setShakeMap,
+}: SortableHabitCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging: isSortableDragging,
+  } = useSortable({ id: habit.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isSortableDragging ? 9999 : 1,
+    position: "relative" as const,
+    opacity: isSortableDragging ? 0 : 1,
+  };
+
+  const today = getTodayISO();
+  const log = habitLogs.find((entry) => entry.date === today);
+  const target = Math.max(1, habit.dailyTarget ?? 1);
+  const count = Math.min(target, log?.count ?? 0);
+  const progress = target ? count / target : 0;
+  const done = progress >= 1;
+  const streakWeeks = getDisciplineStreakWeeks(habitLogs, habit.id, today);
+  const streakFlames = getFlameCount(streakWeeks);
+  const Icon = habit.category ? getCategoryMeta(habit.category).icon : Tag;
+
+  return (
+    <div ref={setNodeRef} style={style} className={shakeClass}>
+      <Card
+        className="transition-shadow duration-200"
+        style={{
+          boxShadow: isSortableDragging 
+            ? "0 25px 50px rgba(0,0,0,0.35)" 
+            : "0 4px 12px rgba(0,0,0,0.08)",
+          transform: isSortableDragging ? "scale(1.02)" : "scale(1)",
+        }}
+      >
+        <CardContent>
+          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3">
+            <div
+              className="flex cursor-grab items-center self-center"
+              style={{ touchAction: "none" }}
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical size={20} className="text-muted-foreground" />
+            </div>
+            <div className="flex min-w-0 items-start gap-3" onClick={() => onOpen(habit)}>
+              <span
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/5"
+                style={{ color: habit.colorToken }}
+              >
+                <Icon size={22} />
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-base font-semibold">{habit.name}</h3>
+                {habit.description && (
+                  <p className="mt-1 text-sm text-muted-foreground">{habit.description}</p>
+                )}
+                {(streakFlames > 0 || habit.isPriority) && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {streakFlames > 0 && (
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: streakFlames }).map((_, index) => (
+                          <Flame key={`flame-${habit.id}-${index}`} size={14} style={{ color: habit.colorToken }} />
+                        ))}
+                      </div>
+                    )}
+                    {habit.isPriority && (
+                      <Badge variant="secondary" className="gap-1">
+                        <Star size={12} /> {t("priority", locale)}
+                      </Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              className="relative inline-flex h-11 w-11 items-center justify-center rounded-full"
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                const today = getTodayISO();
+                const log = habitLogs.find((entry) => entry.date === today);
+                const currentCount = log ? log.count ?? 1 : 0;
+                const target = Math.max(1, habit.dailyTarget ?? 1);
+                let nextShake: "step" | "complete" | "reset" = "step";
+                if (!log) {
+                  nextShake = "step";
+                } else if (currentCount >= target) {
+                  nextShake = "reset";
+                } else if (currentCount + 1 >= target) {
+                  nextShake = "complete";
+                }
+                if (!log || currentCount < target) {
+                  if (habit.isPriority) {
+                    vibrationFeedback.priorityHabitComplete();
+                  } else {
+                    vibrationFeedback.habitComplete();
+                  }
+                } else {
+                  vibrationFeedback.buttonPress();
+                }
+                setShakeMap((prev) => ({ ...prev, [habit.id]: nextShake }));
+                onToggle(habit.id, habit.isPriority, target);
+              }}
+            >
+              <span
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background: `conic-gradient(${habit.colorToken} ${progress}turn, hsl(var(--muted)) 0)`,
+                  mask: "radial-gradient(circle at center, transparent 58%, black 60%)",
+                  boxShadow: "inset 0 0 0 1px hsl(var(--border))",
+                }}
+              />
+              <span
+                className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-transform ${
+                  done ? "text-white" : ""
+                }`}
+                style={{
+                  background: done ? habit.colorToken : "hsl(var(--muted))",
+                  color: done ? "#fff" : habit.colorToken,
+                  transform: done ? "scale(1.02)" : "scale(1)",
+                }}
+              >
+                {target > 1 && !done ? <Plus size={14} /> : <Check size={14} />}
+              </span>
+            </button>
+          </div>
+          <div className="mt-6" onClick={() => onOpen(habit)}>
+            <Heatmap logs={habitLogs} accent={habit.colorToken} dailyTarget={target} />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}, (prev, next) => {
+  if (prev.habit.id !== next.habit.id) return false;
+  if (prev.isDragging !== next.isDragging) return false;
+  if (prev.locale !== next.locale) return false;
+  if (prev.habitLogs.length !== next.habitLogs.length) return false;
+  for (let i = 0; i < prev.habitLogs.length; i++) {
+    const prevLog = prev.habitLogs[i];
+    const nextLog = next.habitLogs[i];
+    if (prevLog.date !== nextLog.date || prevLog.count !== nextLog.count || prevLog.status !== nextLog.status) {
+      return false;
+    }
   }
-
-  if (nextCount >= target && nextCount > 0) {
-    nextShake = "complete";
-  }
-
-  return { nextCount, nextShake };
-};
+  return true;
+});
 
 const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHabits }: HomeScreenProps) => {
-  const [shakeMap, setShakeMap] = useState<Record<string, "step" | "complete" | "reset" | null>>({});
   const [orderedHabits, setOrderedHabits] = useState(habits);
-  const [draggingHabitId, setDraggingHabitId] = useState<string | null>(null);
-  const pendingOrderRef = useRef(habits);
-  const dragBlockRef = useRef(false);
-  const dragTimeoutRef = useRef<number | null>(null);
-  const cardDelayRef = useRef(new Map<string, number>());
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [shakeMap, setShakeMap] = useState<Record<string, "step" | "complete" | "reset" | null>>({});
 
   const logsByHabit = useMemo(() => buildLogsByHabit(logs), [logs]);
 
@@ -98,14 +272,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
 
   useEffect(() => {
     setOrderedHabits(habits);
-    pendingOrderRef.current = habits;
   }, [habits]);
-
-  useEffect(() => {
-    return () => {
-      if (dragTimeoutRef.current) window.clearTimeout(dragTimeoutRef.current);
-    };
-  }, []);
 
   const normalizePriority = (next: Habit[]) => {
     const priority = next.filter((habit) => habit.isPriority);
@@ -113,285 +280,195 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
     return [...priority, ...normal];
   };
 
-  const blockClick = () => {
-    dragBlockRef.current = true;
-    if (dragTimeoutRef.current) window.clearTimeout(dragTimeoutRef.current);
-    dragTimeoutRef.current = window.setTimeout(() => {
-      dragBlockRef.current = false;
-    }, 180);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+    document.body.style.overflow = "hidden";
+    vibrationFeedback.dragStart();
+  }, []);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    document.body.style.overflow = "";
+
+    if (over && active.id !== over.id) {
+      const oldIndex = orderedHabits.findIndex((item) => item.id === active.id);
+      const newIndex = orderedHabits.findIndex((item) => item.id === over.id);
+      const newOrder = arrayMove(orderedHabits, oldIndex, newIndex);
+      const normalized = normalizePriority(newOrder);
+      
+      setOrderedHabits(normalized);
+      
+      // Отправляем обновление порядка
+      const ids = normalized.map((habit) => habit.id);
+      const currentIds = habits.map((habit) => habit.id);
+      if (ids.join("|") !== currentIds.join("|")) {
+        onReorderHabits(ids);
+      }
+      
+      vibrationFeedback.dropSuccess();
+    }
+  }, [orderedHabits, habits, onReorderHabits]);
+
+  const dropAnimation: DropAnimation = {
+    sideEffects: defaultDropAnimationSideEffects({
+      styles: {
+        active: {
+          opacity: "0",
+        },
+      },
+    }),
   };
 
-  const HabitReorderItem = ({
-    habit,
-    habitLogs,
-    log,
-    target,
-    progress,
-    done,
-    streakFlames,
-    Icon,
-    shakeClass,
-    delay,
-  }: {
-    habit: Habit;
-    habitLogs: HabitLog[];
-    log: HabitLog | undefined;
-    target: number;
-    progress: number;
-    done: boolean;
-    streakFlames: number;
-    Icon: typeof Tag;
-    shakeClass: string;
-    delay: number;
-  }) => {
-    const dragControls = useDragControls();
-    const holdTimeoutRef = useRef<number | null>(null);
-    const pressPointRef = useRef<{ x: number; y: number } | null>(null);
-    const pointerEventRef = useRef<globalThis.PointerEvent | null>(null);
-    const [dragActive, setDragActive] = useState(false);
+  const activeHabit = activeId ? orderedHabits.find((h) => h.id === activeId) : null;
+  const activeHabitLogs = activeId ? logsByHabit.get(activeId) ?? EMPTY_LOGS : EMPTY_LOGS;
 
-    const clearHoldTimeout = () => {
-      if (holdTimeoutRef.current) {
-        window.clearTimeout(holdTimeoutRef.current);
-        holdTimeoutRef.current = null;
-      }
-    };
+  const today = getTodayISO();
+  const activeLog = activeHabit ? activeHabitLogs.find((entry) => entry.date === today) : null;
+  const activeTarget = activeHabit ? Math.max(1, activeHabit.dailyTarget ?? 1) : 1;
+  const activeCount = activeHabit ? Math.min(activeTarget, activeLog?.count ?? 0) : 0;
+  const activeProgress = activeTarget ? activeCount / activeTarget : 0;
+  const activeDone = activeProgress >= 1;
+  const activeStreakWeeks = activeHabit ? getDisciplineStreakWeeks(activeHabitLogs, activeHabit.id, today) : 0;
+  const activeStreakFlames = getFlameCount(activeStreakWeeks);
 
-    const handlePointerDown = (event: PointerEvent<HTMLLIElement>) => {
-      clearHoldTimeout();
-      pressPointRef.current = { x: event.clientX, y: event.clientY };
-      pointerEventRef.current = event.nativeEvent as globalThis.PointerEvent;
-      event.currentTarget.setPointerCapture(event.pointerId);
-      holdTimeoutRef.current = window.setTimeout(() => {
-        if (pointerEventRef.current) {
-          setDragActive(true);
-          dragControls.start(pointerEventRef.current);
-        }
-      }, 180);
-    };
-
-    const handlePointerMove = (event: PointerEvent<HTMLLIElement>) => {
-      if (!pressPointRef.current) return;
-      const dx = Math.abs(event.clientX - pressPointRef.current.x);
-      const dy = Math.abs(event.clientY - pressPointRef.current.y);
-      if (dx > 8 || dy > 8) {
-        clearHoldTimeout();
-        pressPointRef.current = null;
-        pointerEventRef.current = null;
-        setDragActive(false);
-      }
-    };
-
-    const handlePointerEnd = () => {
-      clearHoldTimeout();
-      pressPointRef.current = null;
-      pointerEventRef.current = null;
-      setDragActive(false);
-    };
-
+  if (habits.length === 0) {
     return (
-      <Reorder.Item
-        className={`grid cursor-grab gap-4 ${shakeClass}`}
-        key={habit.id}
-        value={habit}
-        layout="position"
-        drag
-        dragControls={dragControls}
-        dragListener={false}
-        dragElastic={0.18}
-        dragMomentum={false}
-        style={{
-          boxShadow: draggingHabitId === habit.id ? "0 18px 40px rgba(0,0,0,0.2)" : "none",
-          touchAction: dragActive ? "none" : "pan-y",
-        }}
-        initial={{ opacity: 0.25, y: 12 }}
-        transition={{
-          layout: { type: "spring", stiffness: 520, damping: 38 },
-        }}
-        whileDrag={{ scale: 1.02, cursor: "grabbing" }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerEnd}
-        onPointerCancel={handlePointerEnd}
-        onPointerLeave={handlePointerEnd}
-        onDragStart={() => {
-          blockClick();
-          setDraggingHabitId(habit.id);
-          vibrationFeedback.dragStart();
-        }}
-        onDragEnd={() => {
-          blockClick();
-          vibrationFeedback.dropSuccess();
-          setDraggingHabitId(null);
-          setDragActive(false);
-          commitOrder(pendingOrderRef.current);
-        }}
-        onClick={() => {
-          if (dragBlockRef.current) return;
-          onOpen(habit);
-        }}
-      >
-        <Card>
-          <CardContent>
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <span
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/5"
-                  style={{ color: habit.colorToken }}
-                >
-                  <Icon size={22} />
-                </span>
-                <div className="min-w-0">
-                  <h3 className="text-base font-semibold">{habit.name}</h3>
-                  {habit.description && (
-                    <p className="mt-1 text-sm text-muted-foreground">{habit.description}</p>
-                  )}
-                  {(streakFlames > 0 || habit.isPriority) && (
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      {streakFlames > 0 && (
-                        <div className="flex items-center gap-1">
-                          {Array.from({ length: streakFlames }).map((_, index) => (
-                            <Flame key={`flame-${habit.id}-${index}`} size={14} style={{ color: habit.colorToken }} />
-                          ))}
-                        </div>
-                      )}
-                      {habit.isPriority && (
-                        <Badge variant="secondary" className="gap-1">
-                          <Star size={12} /> {t("priority", locale)}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <button
-                className="relative inline-flex h-11 w-11 items-center justify-center rounded-full"
-                type="button"
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  const { nextCount, nextShake } = getToggleState(log, target);
-
-                  if (nextCount >= target && nextCount > 0) {
-                    if (habit.isPriority) {
-                      vibrationFeedback.priorityHabitComplete();
-                    } else {
-                      vibrationFeedback.habitComplete();
-                    }
-                  } else {
-                    vibrationFeedback.buttonPress();
-                  }
-
-                  setShakeMap((prev) => ({ ...prev, [habit.id]: nextShake }));
-                  onToggle(habit.id, habit.isPriority, target);
-                }}
-              >
-                <span
-                  className="absolute inset-0 rounded-full"
-                  style={{
-                    background: `conic-gradient(${habit.colorToken} ${progress}turn, hsl(var(--muted)) 0)`,
-                    mask: "radial-gradient(circle at center, transparent 58%, black 60%)",
-                    boxShadow: "inset 0 0 0 1px hsl(var(--border))",
-                  }}
-                />
-                <span
-                  className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-transform ${
-                    done ? "text-white" : ""
-                  }`}
-                  style={{
-                    background: done ? habit.colorToken : "hsl(var(--muted))",
-                    color: done ? "#fff" : habit.colorToken,
-                    transform: done ? "scale(1.02)" : "scale(1)",
-                  }}
-                >
-                  {target > 1 && !done ? <Plus size={14} /> : <Check size={14} />}
-                </span>
-              </button>
-            </div>
-            <div className="mt-6">
-              <Heatmap logs={habitLogs} accent={habit.colorToken} dailyTarget={target} />
-            </div>
-          </CardContent>
-        </Card>
-      </Reorder.Item>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("habits", locale)}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{t("emptyHabits", locale)}</p>
+          <Button className="mt-4" onClick={onAdd} type="button">
+            {t("addHabit", locale)}
+          </Button>
+        </CardContent>
+      </Card>
     );
-  };
-
-  const commitOrder = (nextOrder: Habit[]) => {
-    const ids = nextOrder.map((habit) => habit.id);
-    const currentIds = habits.map((habit) => habit.id);
-    if (ids.length === 0 || ids.join("|") === currentIds.join("|")) return;
-    onReorderHabits(ids);
-  };
+  }
 
   return (
-    <Reorder.Group
-      axis="y"
-      values={orderedHabits}
-      onReorder={(next) => {
-        const normalized = normalizePriority(next);
-        setOrderedHabits(normalized);
-        pendingOrderRef.current = normalized;
-      }}
-      as="div"
-      className="grid gap-4"
-      onPointerDown={(event) => event.stopPropagation()}
-      onTouchStart={(event) => event.stopPropagation()}
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
     >
-      {habits.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("habits", locale)}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              {t("emptyHabits", locale)}
-            </p>
-            <Button className="mt-4" onClick={onAdd} type="button">
-              {t("addHabit", locale)}
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        orderedHabits.map((habit) => {
-          const today = getTodayISO();
-          const habitLogs = logsByHabit.get(habit.id) ?? [];
-          const log = habitLogs.find((entry) => entry.date === today);
-          const target = Math.max(1, habit.dailyTarget ?? 1);
-          const count = Math.min(target, log?.count ?? 0);
-          const progress = target ? count / target : 0;
-          const done = progress >= 1;
-          const streakWeeks = getDisciplineStreakWeeks(habitLogs, habit.id, today);
-          const streakFlames = getFlameCount(streakWeeks);
-          const Icon = habit.category ? getCategoryMeta(habit.category).icon : Tag;
-          const shake = shakeMap[habit.id];
-          const shakeClass = getShakeClass(shake);
-          const delay = (() => {
-            const existing = cardDelayRef.current.get(habit.id);
-            if (existing !== undefined) return existing;
-            const next = 0.04 + Math.random() * 0.18;
-            cardDelayRef.current.set(habit.id, next);
-            return next;
-          })();
+      <SortableContext items={orderedHabits.map(h => h.id)} strategy={verticalListSortingStrategy}>
+        <div className="grid gap-4">
+          {orderedHabits.map((habit) => {
+            const habitLogs = logsByHabit.get(habit.id) ?? EMPTY_LOGS;
+            const shake = shakeMap[habit.id];
+            const shakeClass = getShakeClass(shake);
+            return (
+              <SortableHabitCard
+                key={habit.id}
+                habit={habit}
+                habitLogs={habitLogs}
+                locale={locale}
+                isDragging={activeId === habit.id}
+                onToggle={onToggle}
+                onOpen={onOpen}
+                shakeClass={shakeClass}
+                setShakeMap={setShakeMap}
+              />
+            );
+          })}
+        </div>
+      </SortableContext>
 
-          return (
-            <HabitReorderItem
-              key={habit.id}
-              habit={habit}
-              habitLogs={habitLogs}
-              log={log}
-              target={target}
-              progress={progress}
-              done={done}
-              streakFlames={streakFlames}
-              Icon={Icon}
-              shakeClass={shakeClass}
-              delay={delay}
-            />
-          );
-        })
-      )}
-    </Reorder.Group>
+      <DragOverlay dropAnimation={dropAnimation}>
+        {activeHabit ? (
+          <Card
+            style={{
+              boxShadow: "0 25px 50px rgba(0,0,0,0.4)",
+              transform: "scale(1.03)",
+            }}
+          >
+            <CardContent>
+              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3">
+                <div className="flex cursor-grabbing items-center self-center">
+                  <GripVertical size={20} className="text-muted-foreground" />
+                </div>
+                <div className="flex min-w-0 items-start gap-3">
+                  <span
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/5"
+                    style={{ color: activeHabit.colorToken }}
+                  >
+                    {(() => {
+                      const IconComponent = activeHabit.category ? getCategoryMeta(activeHabit.category).icon : Tag;
+                      return <IconComponent size={22} />;
+                    })()}
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-semibold">{activeHabit.name}</h3>
+                    {activeHabit.description && (
+                      <p className="mt-1 text-sm text-muted-foreground">{activeHabit.description}</p>
+                    )}
+                    {(activeStreakFlames > 0 || activeHabit.isPriority) && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {activeStreakFlames > 0 && (
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: activeStreakFlames }).map((_, index) => (
+                              <Flame key={`drag-flame-${activeHabit.id}-${index}`} size={14} style={{ color: activeHabit.colorToken }} />
+                            ))}
+                          </div>
+                        )}
+                        {activeHabit.isPriority && (
+                          <Badge variant="secondary" className="gap-1">
+                            <Star size={12} /> {t("priority", locale)}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <button
+                  className="relative inline-flex h-11 w-11 items-center justify-center rounded-full"
+                  type="button"
+                >
+                  <span
+                    className="absolute inset-0 rounded-full"
+                    style={{
+                      background: `conic-gradient(${activeHabit.colorToken} ${activeProgress}turn, hsl(var(--muted)) 0)`,
+                      mask: "radial-gradient(circle at center, transparent 58%, black 60%)",
+                      boxShadow: "inset 0 0 0 1px hsl(var(--border))",
+                    }}
+                  />
+                  <span
+                    className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-transform ${
+                      activeDone ? "text-white" : ""
+                    }`}
+                    style={{
+                      background: activeDone ? activeHabit.colorToken : "hsl(var(--muted))",
+                      color: activeDone ? "#fff" : activeHabit.colorToken,
+                      transform: activeDone ? "scale(1.02)" : "scale(1)",
+                    }}
+                  >
+                    {activeTarget > 1 && !activeDone ? <Plus size={14} /> : <Check size={14} />}
+                  </span>
+                </button>
+              </div>
+              <div className="mt-6">
+                <Heatmap logs={activeHabitLogs} accent={activeHabit.colorToken} dailyTarget={activeTarget} />
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 };
 

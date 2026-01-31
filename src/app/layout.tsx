@@ -88,18 +88,31 @@ export default async function RootLayout({
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `(() => {
-  try {
-    const root = document.documentElement;
-    const stored = localStorage.getItem("program21.theme");
-    const apply = (mode) => {
-      const resolved = mode && mode !== "system" ? mode : (window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light");
-      root.dataset.theme = resolved;
-      root.dataset.appearance = resolved;
-      root.style.backgroundColor = resolved === "dark" ? "#0a0b0f" : "#ffffff";
-      root.style.colorScheme = resolved;
+  const apply = (mode) => {
+    const resolved = mode && mode !== "system" ? mode : (window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light");
+    document.documentElement.dataset.theme = resolved;
+    document.documentElement.dataset.appearance = resolved;
+    document.documentElement.style.backgroundColor = resolved === "dark" ? "#0a0b0f" : "#ffffff";
+    document.documentElement.style.colorScheme = resolved;
+  };
+  // Try to get theme from cookie first (set by server), then fallback
+  const cookieTheme = document.cookie.match(/program21\.theme=([^;]+)/)?.[1];
+  if (cookieTheme) {
+    apply(cookieTheme);
+  } else {
+    // Wait for IndexedDB to be available and read theme
+    const checkDb = async () => {
+      try {
+        const { openDB } = await import('idb');
+        const db = await openDB('program-21', 2);
+        const theme = await db.get('meta', 'theme');
+        apply(theme || 'system');
+      } catch {
+        apply('system');
+      }
     };
-    apply(stored);
-  } catch (e) {}
+    checkDb();
+  }
 })();`,
           }}
         />
