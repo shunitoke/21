@@ -315,6 +315,11 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
     setActiveId(event.active.id as string);
     document.body.style.overflow = "hidden";
     document.body.style.touchAction = "none";
+    const root = document.querySelector<HTMLDivElement>(".app-root");
+    if (root) {
+      root.style.overflow = "hidden";
+      root.style.touchAction = "none";
+    }
     vibrationFeedback.dragStart();
   }, []);
 
@@ -323,6 +328,11 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
     setActiveId(null);
     document.body.style.overflow = "";
     document.body.style.touchAction = "";
+    const root = document.querySelector<HTMLDivElement>(".app-root");
+    if (root) {
+      root.style.overflow = "";
+      root.style.touchAction = "";
+    }
 
     if (over && active.id !== over.id) {
       const oldIndex = orderedHabits.findIndex((item) => item.id === active.id);

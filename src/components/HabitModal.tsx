@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { vibrationFeedback } from "@/utils/vibrationUtils";
+import { vibrationFeedback, triggerVibration } from "@/utils/vibrationUtils";
 
 interface HabitModalProps {
   open: boolean;
@@ -355,7 +355,7 @@ const HabitModal = ({
                         const iso = toISODate(day);
                         setSelectedDate(iso);
                         onToggleDate?.(habit.id, iso, targetValue);
-                        vibrationFeedback.priorityButtonPress();
+                        triggerVibration("important");
                       }}
                       onMonthChange={setDetailMonth}
                       disabled={{ after: today }}
