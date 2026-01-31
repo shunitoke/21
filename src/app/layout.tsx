@@ -22,10 +22,11 @@ const pressStart = Press_Start_2P({
   weight: ["400"],
 });
 
-const APP_TITLE = "Program 21";
-const APP_DESCRIPTION = "Private habit trainer and practice space.";
+const APP_TITLE = "Программа 21";
+const APP_DESCRIPTION = "Приватный трекер привычек и место практики.";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://21-five-gamma.vercel.app"),
   title: APP_TITLE,
   description: APP_DESCRIPTION,
   applicationName: APP_TITLE,
