@@ -7,7 +7,7 @@ import {
   closestCenter,
   KeyboardSensor,
   MouseSensor,
-  PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -300,14 +300,15 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
   };
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(TouchSensor, {
       activationConstraint: {
-        distance: 20,
+        delay: 0,
+        tolerance: 5,
       },
     }),
     useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 20,
+        distance: 8,
       },
     }),
     useSensor(KeyboardSensor, {
