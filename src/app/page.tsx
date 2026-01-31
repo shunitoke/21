@@ -438,7 +438,7 @@ export default function Home() {
 
   return (
     <div
-      className="app-root min-h-[100svh] w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-6 text-foreground"
+      className="app-root flex min-h-[100svh] flex-col w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-6 text-foreground"
       style={{ maxWidth: '100vw', overflowX: 'hidden', touchAction: 'pan-y' }}
       onClickCapture={(event) => {
         if (!didSwipeRef.current) return;
@@ -447,7 +447,7 @@ export default function Home() {
         didSwipeRef.current = false;
       }}
     >
-      <header className="mb-6 flex items-center justify-between gap-4 overflow-hidden" style={{ maxWidth: '100%', overflowX: 'hidden', minWidth: '0', flexShrink: '1', flexBasis: '0', boxSizing: 'border-box' }}>
+      <header className="mb-6 flex items-center justify-between gap-4 overflow-hidden" style={{ maxWidth: '100%', overflowX: 'hidden', minWidth: '0', boxSizing: 'border-box' }}>
         <div className="flex items-baseline gap-3">
           <Button
             type="button"
@@ -507,7 +507,34 @@ export default function Home() {
           </Button>
         </div>
       </header>
-      <div style={{ position: "relative", overflow: "hidden", width: "100%" }}>
+      <div
+        className="flex flex-1 flex-col"
+        style={{ position: "relative", overflow: "hidden", width: "100%" }}
+        onPointerDown={(e) => {
+          if (background.screen !== "home" && background.screen !== "progress" && background.screen !== "practice") return;
+          dragStartXRef.current = e.clientX;
+          didSwipeRef.current = false;
+        }}
+        onPointerMove={(e) => {
+          if (dragStartXRef.current === null) return;
+          const dx = e.clientX - dragStartXRef.current;
+          if (Math.abs(dx) > 10) didSwipeRef.current = true;
+        }}
+        onPointerUp={(e) => {
+          if (dragStartXRef.current === null) return;
+          if (hasDialogOverlay) {
+            dragStartXRef.current = null;
+            return;
+          }
+          const dx = e.clientX - dragStartXRef.current;
+          if (dx < -60) {
+            handleSwipe(1);
+          } else if (dx > 60) {
+            handleSwipe(-1);
+          }
+          dragStartXRef.current = null;
+        }}
+      >
         <AnimatePresence
           initial={true}
           custom={transitionDir}
@@ -526,37 +553,13 @@ export default function Home() {
           initial="enter"
           animate="center"
           exit="exit"
-          className="w-full"
+          className="w-full flex-1"
           transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
           drag={background.screen === "home" || background.screen === "progress" || background.screen === "practice" ? "x" : false}
           dragListener={false}
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.12}
           style={{ touchAction: "pan-y" }}
-          onPointerDown={(e) => {
-            if (background.screen !== "home" && background.screen !== "progress" && background.screen !== "practice") return;
-            dragStartXRef.current = e.clientX;
-            didSwipeRef.current = false;
-          }}
-          onPointerMove={(e) => {
-            if (dragStartXRef.current === null) return;
-            const dx = e.clientX - dragStartXRef.current;
-            if (Math.abs(dx) > 10) didSwipeRef.current = true;
-          }}
-          onPointerUp={(e) => {
-            if (dragStartXRef.current === null) return;
-            if (hasDialogOverlay) {
-              dragStartXRef.current = null;
-              return;
-            }
-            const dx = e.clientX - dragStartXRef.current;
-            if (dx < -60) {
-              handleSwipe(1);
-            } else if (dx > 60) {
-              handleSwipe(-1);
-            }
-            dragStartXRef.current = null;
-          }}
         >
           {background.screen === "home" && (
             <HomeScreen
