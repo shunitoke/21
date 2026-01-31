@@ -7,6 +7,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -301,9 +302,14 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5,
-        delay: 150,
-        tolerance: 5,
+        delay: 200,
+        tolerance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 8,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -314,25 +320,17 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string);
     document.body.style.overflow = "hidden";
-    document.body.style.touchAction = "none";
     const root = document.querySelector<HTMLDivElement>(".app-root");
-    if (root) {
-      root.style.overflow = "hidden";
-      root.style.touchAction = "none";
-    }
-    vibrationFeedback.dragStart();
+    if (root) root.style.overflow = "hidden";
+    vibrationFeedback.dropSuccess();
   }, []);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
     document.body.style.overflow = "";
-    document.body.style.touchAction = "";
     const root = document.querySelector<HTMLDivElement>(".app-root");
-    if (root) {
-      root.style.overflow = "";
-      root.style.touchAction = "";
-    }
+    if (root) root.style.overflow = "";
 
     if (over && active.id !== over.id) {
       const oldIndex = orderedHabits.findIndex((item) => item.id === active.id);
@@ -348,10 +346,16 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
       if (ids.join("|") !== currentIds.join("|")) {
         onReorderHabits(ids);
       }
-      
-      vibrationFeedback.dropSuccess();
     }
   }, [orderedHabits, habits, onReorderHabits]);
+
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = "";
+      const root = document.querySelector<HTMLDivElement>(".app-root");
+      if (root) root.style.overflow = "";
+    };
+  }, []);
 
   const dropAnimation: DropAnimation = {
     sideEffects: defaultDropAnimationSideEffects({
