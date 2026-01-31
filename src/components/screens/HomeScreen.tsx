@@ -302,12 +302,12 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 20,
       },
     }),
     useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 20,
       },
     }),
     useSensor(KeyboardSensor, {
