@@ -302,7 +302,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
   const sensors = useSensors(
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 0,
+        delay: 200,
         tolerance: 5,
       },
     }),
