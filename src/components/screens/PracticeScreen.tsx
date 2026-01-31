@@ -24,17 +24,19 @@ import {
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { ChevronDown, ChevronUp, Filter, GripVertical, Moon, Pause, Play, Sun, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Filter, GripVertical, Moon, Pause, Play, Sun, Trash2, X, FileText, Mic } from "lucide-react";
 import type { JournalEntry, Locale, StopCraneItem } from "@/lib/types";
 import { t } from "@/lib/i18n";
 const JournalModal = dynamic(() => import("@/components/JournalModal"), { ssr: false });
 const AnchorModal = dynamic(() => import("@/components/AnchorModal"), { ssr: false });
 const AudioAnchor = dynamic(() => import("@/components/AudioAnchor"), { ssr: false });
 const EmotionSelector = dynamic(() => import("@/components/EmotionSelector"), { ssr: false });
+const JournalTimeline = dynamic(() => import("@/components/JournalEntryCard").then(mod => ({ default: mod.JournalTimeline })), { ssr: false });
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
@@ -146,62 +148,6 @@ const JournalToolbar = ({
     </div>
   );
 };
-
-const JournalEntryCard = ({
-  entry,
-  locale,
-  collapsed,
-  onDelete,
-}: {
-  entry: JournalEntry;
-  locale: Locale;
-  collapsed: boolean;
-  onDelete: (entry: JournalEntry) => void;
-}) => (
-  <Card
-    className={`transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 ${
-      collapsed ? "px-3 py-2" : "p-4"
-    }`}
-  >
-    <div className={`flex items-center justify-between ${collapsed ? "gap-2" : "gap-3"}`}>
-      <p className="text-xs uppercase tracking-wider text-muted-foreground">
-        {new Date(entry.date).toLocaleDateString()}
-      </p>
-      <Button size="icon-sm" variant="outline" type="button" onClick={() => onDelete(entry)} aria-label={t("delete", locale)}>
-        <Trash2 size={14} />
-      </Button>
-    </div>
-    {collapsed && <p className="mt-0 text-sm leading-snug break-words">{getEntryPreview(entry, locale)}</p>}
-    <Collapsible open={!collapsed}>
-      <CollapsibleContent
-        className={`data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down ${
-          collapsed ? "" : "pt-2"
-        }`}
-      >
-        {entry.type === "audio" ? (
-          <div className="mt-3">
-            <AudioAnchor src={entry.content} locale={locale} />
-            {entry.textContent && <p className="mt-3 text-sm leading-snug break-words">{entry.textContent}</p>}
-          </div>
-        ) : (
-          <p className="mt-3 text-sm leading-snug break-words">{entry.content}</p>
-        )}
-        {entry.emotions?.length > 0 && (
-          <div className="mt-5 flex flex-wrap gap-2">
-            {entry.emotions.map((emotion) => {
-              const label = emotionLabels[emotion] ?? { ru: emotion, en: emotion };
-              return (
-                <Badge key={`${entry.id}-${emotion}`} variant="secondary" className="text-[11px] font-semibold">
-                  {locale === "ru" ? label.ru : label.en}
-                </Badge>
-              );
-            })}
-          </div>
-        )}
-      </CollapsibleContent>
-    </Collapsible>
-  </Card>
-);
 
 const breathingPhases = ["inhale", "hold", "exhale"] as const;
 type BreathingPhase = (typeof breathingPhases)[number];
@@ -814,16 +760,13 @@ const PracticeScreen = ({
           {journal.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("noEntriesYet", locale)}</p>
           ) : (
-            <div className="grid gap-3" style={{ contain: 'layout paint' }}>
-              {pagedJournal.map((entry) => (
-                <JournalEntryCard
-                  key={entry.id}
-                  entry={entry}
-                  locale={locale}
-                  collapsed={collapsed}
-                  onDelete={setJournalToDelete}
-                />
-              ))}
+            <div className="pl-2" style={{ contain: 'layout paint' }}>
+              <JournalTimeline
+                entries={pagedJournal}
+                locale={locale}
+                onDelete={setJournalToDelete}
+                collapsed={collapsed}
+              />
             {filteredJournal.length > visibleCount && (
               <div className="flex justify-center">
                 <Button type="button" variant="outline" onClick={() => setVisibleCount((prev) => prev + pageSize)}>

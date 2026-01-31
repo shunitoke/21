@@ -286,6 +286,8 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
               onSubmit({
                 id: `journal-${Date.now()}`,
                 date: new Date().toISOString(),
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                timezoneOffset: new Date().getTimezoneOffset(),
                 type: audioUrl ? "audio" : "text",
                 encryptedContent: "",
                 content: audioUrl ?? content.trim(),

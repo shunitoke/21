@@ -99,6 +99,54 @@ export const dictionary: Dictionary = {
     ru: "Удалить",
     en: "Delete",
   },
+  exportData: {
+    ru: "Экспорт данных",
+    en: "Export Data",
+  },
+  importData: {
+    ru: "Импорт данных",
+    en: "Import Data",
+  },
+  exportDataHint: {
+    ru: "Сохраните все ваши привычки, записи и настройки в файл",
+    en: "Save all your habits, entries and settings to a file",
+  },
+  importDataHint: {
+    ru: "Восстановите данные из ранее сохраненного файла",
+    en: "Restore data from a previously saved file",
+  },
+  importError: {
+    ru: "Ошибка импорта: неверный пароль или поврежденный файл",
+    en: "Import error: invalid password or corrupted file",
+  },
+  exportPasswordTitle: {
+    ru: "Защита паролем",
+    en: "Password Protection",
+  },
+  exportPasswordDescription: {
+    ru: "Введите пароль для шифрования архива",
+    en: "Enter a password to encrypt the archive",
+  },
+  importPasswordTitle: {
+    ru: "Введите пароль",
+    en: "Enter Password",
+  },
+  importPasswordDescription: {
+    ru: "Введите пароль для расшифровки архива",
+    en: "Enter the password to decrypt the archive",
+  },
+  passwordPlaceholder: {
+    ru: "Пароль",
+    en: "Password",
+  },
+  export: {
+    ru: "Экспорт",
+    en: "Export",
+  },
+  import: {
+    ru: "Импорт",
+    en: "Import",
+  },
   deleteConfirmTitle: {
     ru: "Удалить привычку?",
     en: "Delete habit?",

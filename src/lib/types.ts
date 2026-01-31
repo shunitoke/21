@@ -54,6 +54,8 @@ export type JournalEntryType = "text" | "audio";
 export interface JournalEntry {
   id: string;
   date: string;
+  timezone: string; // IANA timezone name, e.g., "Europe/Moscow"
+  timezoneOffset: number; // Minutes from UTC, e.g., -180 for UTC+3
   type: JournalEntryType;
   encryptedContent: string;
   content: string;

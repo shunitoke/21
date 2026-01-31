@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { Archive, Globe, Heart, Moon, Sun } from "lucide-react";
-import type { Habit, Locale, UserSettings } from "@/lib/types";
+import { useRef, useState } from "react";
+import { Archive, Download, Globe, Heart, Lock, Moon, Sun, Upload } from "lucide-react";
+import type { Habit, HabitLog, JournalEntry, Locale, StopCraneItem, UserSettings } from "@/lib/types";
 import { t } from "@/lib/i18n";
+import { exportEncryptedArchive, downloadEncryptedArchive, importEncryptedArchive, restoreMediaFiles } from "@/services/dataExport";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,11 +27,18 @@ interface SettingsScreenProps {
   onUpdate: (settings: Partial<UserSettings>) => void;
   onRestore: (habitId: string) => void;
   onDelete: (habitId: string) => void;
+  onImportData?: (data: { settings: UserSettings; habits: Habit[]; logs: HabitLog[]; journal: JournalEntry[]; stopCrane: StopCraneItem[] }) => void;
 }
 
-const SettingsScreen = ({ locale, settings, habits, onUpdate, onRestore, onDelete }: SettingsScreenProps) => {
+const SettingsScreen = ({ locale, settings, habits, onUpdate, onRestore, onDelete, onImportData }: SettingsScreenProps) => {
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Habit | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [exportPasswordOpen, setExportPasswordOpen] = useState(false);
+  const [importPasswordOpen, setImportPasswordOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const archivedHabits = habits.filter((habit) => habit.archived);
 
   return (
@@ -200,6 +209,142 @@ const SettingsScreen = ({ locale, settings, habits, onUpdate, onRestore, onDelet
               }}
             >
               {t("delete", locale)}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <Card className="transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0">
+        <CardContent>
+          <div className="flex items-center gap-2 text-sm">
+            <Lock size={16} />
+            <span>{t("exportData", locale)}</span>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">{t("exportDataHint", locale)}</p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="mt-3"
+            onClick={() => setExportPasswordOpen(true)}
+          >
+            <Download size={14} className="mr-2" />
+            {t("exportData", locale)}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={exportPasswordOpen} onOpenChange={setExportPasswordOpen}>
+        <AlertDialogContent className="max-w-[420px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("exportPasswordTitle", locale)}</AlertDialogTitle>
+            <AlertDialogDescription>{t("exportPasswordDescription", locale)}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Input
+              type="password"
+              placeholder={t("passwordPlaceholder", locale)}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setPassword(""); setExportPasswordOpen(false); }}>
+              {t("cancel", locale)}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!password}
+              onClick={async () => {
+                try {
+                  const blob = await exportEncryptedArchive(password);
+                  downloadEncryptedArchive(blob);
+                  setPassword("");
+                  setExportPasswordOpen(false);
+                } catch {
+                  // Handle error
+                }
+              }}
+            >
+              {t("export", locale)}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Card className="transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0">
+        <CardContent>
+          <div className="flex items-center gap-2 text-sm">
+            <Upload size={16} />
+            <span>{t("importData", locale)}</span>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">{t("importDataHint", locale)}</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".p21"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file || !onImportData) return;
+              setImportFile(file);
+              setImportPasswordOpen(true);
+              e.target.value = "";
+            }}
+          />
+          {importError && (
+            <p className="mt-2 text-xs text-destructive">{importError}</p>
+          )}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="mt-3"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload size={14} className="mr-2" />
+            {t("importData", locale)}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={importPasswordOpen} onOpenChange={setImportPasswordOpen}>
+        <AlertDialogContent className="max-w-[420px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("importPasswordTitle", locale)}</AlertDialogTitle>
+            <AlertDialogDescription>{t("importPasswordDescription", locale)}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Input
+              type="password"
+              placeholder={t("passwordPlaceholder", locale)}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          {importError && (
+            <p className="mb-4 text-xs text-destructive">{importError}</p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setPassword(""); setImportPasswordOpen(false); setImportFile(null); setImportError(null); }}>
+              {t("cancel", locale)}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!password || !importFile}
+              onClick={async () => {
+                if (!importFile) return;
+                try {
+                  const { data, media } = await importEncryptedArchive(importFile, password);
+                  onImportData?.(data);
+                  await restoreMediaFiles(media);
+                  setPassword("");
+                  setImportPasswordOpen(false);
+                  setImportFile(null);
+                  setImportError(null);
+                } catch (error) {
+                  setImportError(t("importError", locale));
+                }
+              }}
+            >
+              {t("import", locale)}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

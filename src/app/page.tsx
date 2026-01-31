@@ -69,6 +69,7 @@ export default function Home() {
     removeStopCrane,
     replaceStopCrane,
     clearToast,
+    importData,
   } = useAppStore();
 
   useEffect(() => {
@@ -644,6 +645,7 @@ export default function Home() {
               onUpdate={updateSettings}
               onRestore={restoreHabit}
               onDelete={removeHabit}
+              onImportData={importData}
             />
           </div>
         </DialogContent>

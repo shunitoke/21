@@ -22,7 +22,7 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Check, Flame, Plus, Star, Tag, GripVertical } from "lucide-react";
+import { Check, Flame, Plus, Star, Tag } from "lucide-react";
 import type { Habit, HabitLog, Locale } from "@/lib/types";
 import { t } from "@/lib/i18n";
 import { getTodayISO } from "@/lib/date";
@@ -103,7 +103,13 @@ const SortableHabitCard = memo(function SortableHabitCard({
     transform,
     transition,
     isDragging: isSortableDragging,
-  } = useSortable({ id: habit.id });
+  } = useSortable({ 
+    id: habit.id,
+    transition: {
+      duration: 150,
+      easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+    },
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -124,9 +130,15 @@ const SortableHabitCard = memo(function SortableHabitCard({
   const Icon = habit.category ? getCategoryMeta(habit.category).icon : Tag;
 
   return (
-    <div ref={setNodeRef} style={style} className={shakeClass}>
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      className={shakeClass}
+      {...attributes} 
+      {...listeners}
+    >
       <Card
-        className="transition-shadow duration-200"
+        className="transition-shadow duration-200 cursor-grab active:cursor-grabbing"
         style={{
           boxShadow: isSortableDragging 
             ? "0 25px 50px rgba(0,0,0,0.35)" 
@@ -135,39 +147,34 @@ const SortableHabitCard = memo(function SortableHabitCard({
         }}
       >
         <CardContent>
-          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3">
-            <div
-              className="flex cursor-grab items-center self-center"
-              style={{ touchAction: "none" }}
-              {...attributes}
-              {...listeners}
+          <div className="flex items-start gap-3">
+            <div 
+              className="flex min-w-0 flex-1 items-start gap-3" 
+              onClick={() => onOpen(habit)}
             >
-              <GripVertical size={20} className="text-muted-foreground" />
-            </div>
-            <div className="flex min-w-0 items-start gap-3" onClick={() => onOpen(habit)}>
               <span
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/5"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5"
                 style={{ color: habit.colorToken }}
               >
-                <Icon size={22} />
+                <Icon size={26} />
               </span>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <h3 className="text-base font-semibold">{habit.name}</h3>
                 {habit.description && (
-                  <p className="mt-1 text-sm text-muted-foreground">{habit.description}</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground line-clamp-1">{habit.description}</p>
                 )}
                 {(streakFlames > 0 || habit.isPriority) && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
                     {streakFlames > 0 && (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5">
                         {Array.from({ length: streakFlames }).map((_, index) => (
-                          <Flame key={`flame-${habit.id}-${index}`} size={14} style={{ color: habit.colorToken }} />
+                          <Flame key={`flame-${habit.id}-${index}`} size={12} style={{ color: habit.colorToken }} />
                         ))}
                       </div>
                     )}
                     {habit.isPriority && (
-                      <Badge variant="secondary" className="gap-1">
-                        <Star size={12} /> {t("priority", locale)}
+                      <Badge variant="secondary" className="gap-1 h-5 text-[10px]">
+                        <Star size={10} /> {t("priority", locale)}
                       </Badge>
                     )}
                   </div>
@@ -175,7 +182,7 @@ const SortableHabitCard = memo(function SortableHabitCard({
               </div>
             </div>
             <button
-              className="relative inline-flex h-11 w-11 items-center justify-center rounded-full"
+              className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
@@ -226,7 +233,7 @@ const SortableHabitCard = memo(function SortableHabitCard({
               </span>
             </button>
           </div>
-          <div className="mt-6" onClick={() => onOpen(habit)}>
+          <div className="mt-2" onClick={() => onOpen(habit)}>
             <Heatmap logs={habitLogs} accent={habit.colorToken} dailyTarget={target} />
           </div>
         </CardContent>
@@ -234,9 +241,20 @@ const SortableHabitCard = memo(function SortableHabitCard({
     </div>
   );
 }, (prev, next) => {
+  // Check basic props
   if (prev.habit.id !== next.habit.id) return false;
   if (prev.isDragging !== next.isDragging) return false;
   if (prev.locale !== next.locale) return false;
+  
+  // Check habit properties that can change in settings
+  if (prev.habit.name !== next.habit.name) return false;
+  if (prev.habit.description !== next.habit.description) return false;
+  if (prev.habit.dailyTarget !== next.habit.dailyTarget) return false;
+  if (prev.habit.isPriority !== next.habit.isPriority) return false;
+  if (prev.habit.colorToken !== next.habit.colorToken) return false;
+  if (prev.habit.category !== next.habit.category) return false;
+  
+  // Check logs
   if (prev.habitLogs.length !== next.habitLogs.length) return false;
   for (let i = 0; i < prev.habitLogs.length; i++) {
     const prevLog = prev.habitLogs[i];
@@ -284,6 +302,8 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 5,
+        delay: 150,
+        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -398,37 +418,34 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
             }}
           >
             <CardContent>
-              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3">
-                <div className="flex cursor-grabbing items-center self-center">
-                  <GripVertical size={20} className="text-muted-foreground" />
-                </div>
-                <div className="flex min-w-0 items-start gap-3">
+              <div className="flex items-start gap-3">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
                   <span
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/5"
+                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5"
                     style={{ color: activeHabit.colorToken }}
                   >
                     {(() => {
                       const IconComponent = activeHabit.category ? getCategoryMeta(activeHabit.category).icon : Tag;
-                      return <IconComponent size={22} />;
+                      return <IconComponent size={26} />;
                     })()}
                   </span>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <h3 className="text-base font-semibold">{activeHabit.name}</h3>
                     {activeHabit.description && (
-                      <p className="mt-1 text-sm text-muted-foreground">{activeHabit.description}</p>
+                      <p className="mt-0.5 text-sm text-muted-foreground line-clamp-1">{activeHabit.description}</p>
                     )}
                     {(activeStreakFlames > 0 || activeHabit.isPriority) && (
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
                         {activeStreakFlames > 0 && (
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-0.5">
                             {Array.from({ length: activeStreakFlames }).map((_, index) => (
-                              <Flame key={`drag-flame-${activeHabit.id}-${index}`} size={14} style={{ color: activeHabit.colorToken }} />
+                              <Flame key={`drag-flame-${activeHabit.id}-${index}`} size={12} style={{ color: activeHabit.colorToken }} />
                             ))}
                           </div>
                         )}
                         {activeHabit.isPriority && (
-                          <Badge variant="secondary" className="gap-1">
-                            <Star size={12} /> {t("priority", locale)}
+                          <Badge variant="secondary" className="gap-1 h-5 text-[10px]">
+                            <Star size={10} /> {t("priority", locale)}
                           </Badge>
                         )}
                       </div>
@@ -436,7 +453,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
                   </div>
                 </div>
                 <button
-                  className="relative inline-flex h-11 w-11 items-center justify-center rounded-full"
+                  className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
                   type="button"
                 >
                   <span
@@ -461,7 +478,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
                   </span>
                 </button>
               </div>
-              <div className="mt-6">
+              <div className="mt-2">
                 <Heatmap logs={activeHabitLogs} accent={activeHabit.colorToken} dailyTarget={activeTarget} />
               </div>
             </CardContent>

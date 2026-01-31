@@ -377,6 +377,7 @@ interface AppState {
   updateSettings: (settings: Partial<UserSettings>) => void;
   toggleDemoMode: (enabled: boolean) => void;
   clearToast: () => void;
+  importData: (data: { settings: UserSettings; habits: Habit[]; logs: HabitLog[]; journal: JournalEntry[]; stopCrane: StopCraneItem[] }) => void;
 }
 
 type SetState = (partial: Partial<AppState>) => void;
@@ -944,6 +945,27 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
         stopCrane: get().stopCrane,
       },
       get().settings.demoMode
+    );
+  },
+  importData: (data: { settings: UserSettings; habits: Habit[]; logs: HabitLog[]; journal: JournalEntry[]; stopCrane: StopCraneItem[] }) => {
+    const { settings, habits, logs, journal, stopCrane } = data;
+    set({
+      settings: { ...get().settings, ...settings },
+      habits,
+      logs,
+      journal,
+      stopCrane,
+      achievements: computeAchievements(habits, logs, journal),
+    });
+    void persistState(
+      {
+        settings: { ...get().settings, ...settings },
+        habits,
+        logs,
+        journal,
+        stopCrane,
+      },
+      settings.demoMode
     );
   },
 }));
