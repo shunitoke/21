@@ -110,7 +110,8 @@ const Heatmap = ({
   }, [cellSize, gap]);
 
   const totalCols = Math.max(1, Math.ceil(allDates.length / 7));
-  const width = totalCols * (cellSize + gap) - gap;
+  const displayCols = Math.min(totalCols, cols);
+  const width = displayCols * (cellSize + gap) - gap;
   const height = 7 * (cellSize + gap) - gap;
 
   useEffect(() => {
@@ -156,18 +157,20 @@ const Heatmap = ({
       const y = row * (cellSize + gap);
 
       ctx.fillStyle = fillStyle;
-      ctx.fillRect(x, y, cellSize, cellSize);
+      const radius = cellSize * 0.2;
+      ctx.beginPath();
+      ctx.roundRect(x, y, cellSize, cellSize, radius);
+      ctx.fill();
     }
   }, [allDates, logMap, colorsByDate, accent, target, cellSize, gap, intensityByDate, width, height, isDark]);
 
   return (
     <div 
       ref={containerRef} 
-      className="w-full"
+      className="w-full flex"
       style={{ 
-        contain: 'strict',
-        contentVisibility: 'auto',
-        containIntrinsicSize: '0 100px'
+        contain: 'layout paint',
+        lineHeight: 1,
       }}
     >
       <canvas 
@@ -176,7 +179,7 @@ const Heatmap = ({
           width: `${width}px`, 
           height: `${height}px`,
           display: 'block',
-          willChange: 'transform'
+          maxWidth: '100%',
         }} 
       />
     </div>
