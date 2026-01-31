@@ -612,8 +612,6 @@ const PracticeScreen = ({
                   src={imageThumbs[item.id] ?? item.content}
                   alt=""
                   className="h-40 w-full object-cover"
-                  loading="lazy"
-                  decoding="async"
                 />
               </button>
             ) : item.type === "stop" ? (
