@@ -355,7 +355,7 @@ const HabitModal = ({
                         const iso = toISODate(day);
                         setSelectedDate(iso);
                         onToggleDate?.(habit.id, iso, targetValue);
-                        triggerVibration("important");
+                        vibrationFeedback.priorityHabitComplete();
                       }}
                       onMonthChange={setDetailMonth}
                       disabled={{ after: today }}
