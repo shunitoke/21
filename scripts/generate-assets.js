@@ -54,44 +54,49 @@ async function generateAssets() {
     // OG image (social sharing)
     console.log('Generating OG image...');
     
-    // Create a larger OG image with text
+    // Read font file as base64 for embedding
+    const fontPath = path.join(__dirname, '../public/Zvezda NHZDN Bold Italic v.1.1.ttf');
+    const fontBase64 = fs.readFileSync(fontPath).toString('base64');
+    
+    // Create OG image with embedded font - black and white style
     const ogSvg = `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
         <defs>
-          <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#0f1115"/>
-            <stop offset="50%" style="stop-color:#1a1d24"/>
-            <stop offset="100%" style="stop-color:#0f1115"/>
-          </linearGradient>
-          <linearGradient id="text" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" style="stop-color:#ffffff"/>
-            <stop offset="50%" style="stop-color:#a5b4fc"/>
-            <stop offset="100%" style="stop-color:#6366f1"/>
-          </linearGradient>
+          <style>
+            @font-face {
+              font-family: 'Zvezda NHZDN';
+              src: url('data:font/truetype;charset=utf-8;base64,${fontBase64}') format('truetype');
+              font-weight: bold;
+              font-style: italic;
+            }
+          </style>
         </defs>
-        <rect width="1200" height="630" fill="url(#bg)"/>
-        <text x="50%" y="45%" 
+        <rect width="1200" height="630" fill="#000000"/>
+        <text x="50%" y="40%" 
               dominant-baseline="central" 
               text-anchor="middle"
-              font-family="Arial, sans-serif"
-              font-size="200"
+              font-family="'Zvezda NHZDN', sans-serif"
+              font-size="240"
               font-weight="bold"
-              fill="url(#text)">
+              font-style="italic"
+              fill="#ffffff">
           21
         </text>
-        <text x="50%" y="70%" 
+        <text x="50%" y="68%" 
               dominant-baseline="central" 
               text-anchor="middle"
-              font-family="Arial, sans-serif"
-              font-size="48"
-              fill="#fff"
-              letter-spacing="8">
+              font-family="'Zvezda NHZDN', sans-serif"
+              font-size="56"
+              font-weight="bold"
+              font-style="italic"
+              fill="#ffffff"
+              letter-spacing="12">
           PROGRAM 21
         </text>
       </svg>
     `;
     
-    await sharp(Buffer.from(ogSvg))
+    await sharp(Buffer.from(ogSvg), { density: 144 })
       .png()
       .toFile(path.join(__dirname, '../public/og-image.png'));
     console.log('  ✓ og-image.png');

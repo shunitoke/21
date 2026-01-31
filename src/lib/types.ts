@@ -21,6 +21,7 @@ export interface UserSettings {
   theme: ThemePreference;
   ally: AllyTone;
   demoMode?: boolean;
+  tutorialCompleted?: boolean;
 }
 
 export interface Habit {

@@ -74,6 +74,8 @@ export const demoJournal: JournalEntry[] = [
   {
     id: "journal-1",
     date: new Date().toISOString(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezoneOffset: new Date().getTimezoneOffset(),
     type: "text",
     encryptedContent: "",
     content: "Сегодня держал темп и сделал все 3 блока фокуса.",

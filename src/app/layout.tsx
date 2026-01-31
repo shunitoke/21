@@ -46,6 +46,25 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
+  openGraph: {
+    type: "website",
+    title: APP_TITLE,
+    description: APP_DESCRIPTION,
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Program 21 - Private Habit Trainer",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: APP_TITLE,
+    description: APP_DESCRIPTION,
+    images: ["/og-image.png"],
+  },
 };
 
 export const viewport: Viewport = {

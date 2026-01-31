@@ -31,7 +31,8 @@ const getDefaultSettings = () => ({
   locale: detectSystemLocale(),
   theme: "system" as const,
   ally: "friend" as const,
-  demoMode: true,
+  demoMode: false,
+  tutorialCompleted: false,
 });
 
 const persistState = (
@@ -378,6 +379,7 @@ interface AppState {
   toggleDemoMode: (enabled: boolean) => void;
   clearToast: () => void;
   importData: (data: { settings: UserSettings; habits: Habit[]; logs: HabitLog[]; journal: JournalEntry[]; stopCrane: StopCraneItem[] }) => void;
+  completeTutorial: () => void;
 }
 
 type SetState = (partial: Partial<AppState>) => void;
@@ -397,28 +399,6 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
     const persisted = await loadState();
     if (!persisted) {
       const settings = getDefaultSettings();
-      if (settings.demoMode) {
-        set({
-          settings: demoSettings,
-          habits: demoHabits,
-          logs: demoLogs,
-          journal: demoJournal,
-          stopCrane: demoStopCrane,
-          achievements: computeAchievements(demoHabits, demoLogs, demoJournal),
-          loading: false,
-        });
-        await persistState(
-          {
-            settings: demoSettings,
-            habits: demoHabits,
-            logs: demoLogs,
-            journal: demoJournal,
-            stopCrane: demoStopCrane,
-          },
-          true
-        );
-        return;
-      }
       set({
         settings,
         habits: defaultHabits,
@@ -443,13 +423,15 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
 
     if (persisted.settings.demoMode) {
       const demoData = await loadState(DEMO_STATE_KEY);
+      // Preserve tutorialCompleted from main state
+      const tutorialCompleted = persisted.settings.tutorialCompleted;
       if (demoData) {
         const migratedHabits = demoData.habits.map((habit) => ({
           ...habit,
           colorToken: getCategoryColor(habit.category),
         }));
         set({
-          settings: demoData.settings,
+          settings: { ...demoData.settings, tutorialCompleted },
           habits: migratedHabits,
           logs: demoData.logs,
           journal: demoData.journal,
@@ -459,7 +441,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
         });
         await persistState(
           {
-            settings: demoData.settings,
+            settings: { ...demoData.settings, tutorialCompleted },
             habits: migratedHabits,
             logs: demoData.logs,
             journal: demoData.journal,
@@ -471,7 +453,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
       }
       await persistState(
         {
-          settings: demoSettings,
+          settings: { ...demoSettings, tutorialCompleted },
           habits: demoHabits,
           logs: demoLogs,
           journal: demoJournal,
@@ -480,7 +462,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
         true
       );
       set({
-        settings: demoSettings,
+        settings: { ...demoSettings, tutorialCompleted },
         habits: demoHabits,
         logs: demoLogs,
         journal: demoJournal,
@@ -520,6 +502,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
   toggleDemoMode: (enabled: boolean) => {
     if (enabled) {
       const currentTheme = get().settings.theme;
+      const tutorialCompleted = get().settings.tutorialCompleted;
       persistThemePreference(currentTheme);
       const mainSnapshot = {
         settings: { ...get().settings, demoMode: true },
@@ -530,7 +513,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
       };
       set({
         screen: "home",
-        settings: { ...demoSettings, theme: currentTheme, demoMode: true },
+        settings: { ...demoSettings, theme: currentTheme, demoMode: true, tutorialCompleted },
         habits: [...demoHabits, ...demoArchivedHabits],
         logs: demoLogs,
         journal: demoJournal,
@@ -545,7 +528,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
         if (demoData) {
           set({
             screen: "home",
-            settings: { ...demoData.settings, theme: currentTheme, demoMode: true },
+            settings: { ...demoData.settings, theme: currentTheme, demoMode: true, tutorialCompleted },
             habits: [...demoData.habits, ...demoArchivedHabits],
             logs: demoData.logs,
             journal: demoData.journal,
@@ -558,7 +541,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
         }
         await persistState(
           {
-            settings: { ...demoSettings, theme: currentTheme, demoMode: true },
+            settings: { ...demoSettings, theme: currentTheme, demoMode: true, tutorialCompleted },
             habits: [...demoHabits, ...demoArchivedHabits],
             logs: demoLogs,
             journal: demoJournal,
@@ -966,6 +949,21 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
         stopCrane,
       },
       settings.demoMode
+    );
+  },
+  completeTutorial: () => {
+    const nextSettings = { ...get().settings, tutorialCompleted: true };
+    set({ settings: nextSettings });
+    // Always save tutorial state to main storage, not demo
+    void persistState(
+      {
+        settings: nextSettings,
+        habits: get().habits,
+        logs: get().logs,
+        journal: get().journal,
+        stopCrane: get().stopCrane,
+      },
+      false // Always save to main state, not demo
     );
   },
 }));

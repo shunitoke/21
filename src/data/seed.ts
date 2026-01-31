@@ -9,6 +9,7 @@ export const defaultSettings: UserSettings = {
   theme: "system",
   ally: "friend",
   demoMode: true,
+  tutorialCompleted: false,
 };
 
 export const demoSettings: UserSettings = {
@@ -232,9 +233,12 @@ export const demoJournal: JournalEntry[] = demoJournalDays.map((date, index) => 
     demoEmotionPool[(index + 3) % demoEmotionPool.length],
   ];
   const tags = ["ритм", "самочувствие", "заметки"][index % 3];
+  const dateObj = new Date(date);
   return {
     id: `demo-journal-${index + 1}`,
-    date: new Date(date).toISOString(),
+    date: dateObj.toISOString(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezoneOffset: dateObj.getTimezoneOffset(),
     type: index % 5 === 0 ? "audio" : "text",
     content: index % 5 === 0 ? "demo-evening-note.mp3" : `День ${index + 1}: фиксирую прогресс и настроение.`,
     encryptedContent: "",

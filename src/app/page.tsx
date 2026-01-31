@@ -18,11 +18,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { getThemePreference } from "@/services/storage";
+import { InteractiveTutorial } from "@/components/InteractiveTutorial";
+import { Spotlight, useSpotlightTour } from "@/components/Spotlight";
 
 export default function Home() {
   const [habitModalOpen, setHabitModalOpen] = useState(false);
   const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [showSpotlight, setShowSpotlight] = useState(false);
+  const [spotlightStep, setSpotlightStep] = useState(0);
   const [hasDialogOverlay, setHasDialogOverlay] = useState(false);
   const [transitionDir, setTransitionDir] = useState(0);
   const [radioSrc, setRadioSrc] = useState<string | null>(null);
@@ -70,11 +75,19 @@ export default function Home() {
     replaceStopCrane,
     clearToast,
     importData,
+    completeTutorial,
   } = useAppStore();
 
   useEffect(() => {
     void init();
   }, [init]);
+
+  useEffect(() => {
+    // Show tutorial on first launch if not completed
+    if (!loading && !settings.tutorialCompleted) {
+      setShowTutorial(true);
+    }
+  }, [loading, settings.tutorialCompleted]);
 
   useEffect(() => {
     const root = document.querySelector<HTMLDivElement>(".app-root");
@@ -441,6 +454,7 @@ export default function Home() {
             variant="outline"
             aria-label={t("settingsTitle", locale)}
             onClick={() => setSettingsOpen(true)}
+            data-tutorial-target="settings"
           >
             <Settings size={16} />
           </Button>
@@ -482,6 +496,7 @@ export default function Home() {
               setSelectedHabit(null);
               setHabitModalOpen(true);
             }}
+            data-tutorial-target="add"
           >
             <Plus size={16} />
           </Button>
@@ -593,6 +608,7 @@ export default function Home() {
             variant={background.screen === "home" ? "default" : "ghost"}
             aria-label={t("homeTitle", locale)}
             onClick={() => setScreenWithDirection("home")}
+            data-tutorial-target="nav-home"
           >
             <HomeIcon size={18} />
           </Button>
@@ -602,6 +618,7 @@ export default function Home() {
             variant={background.screen === "progress" ? "default" : "ghost"}
             aria-label={t("progressTitle", locale)}
             onClick={() => setScreenWithDirection("progress")}
+            data-tutorial-target="nav-progress"
           >
             <LineChart size={18} />
           </Button>
@@ -611,6 +628,7 @@ export default function Home() {
             variant={background.screen === "practice" ? "default" : "ghost"}
             aria-label={t("practiceTitle", locale)}
             onClick={() => setScreenWithDirection("practice")}
+            data-tutorial-target="nav-practice"
           >
             <Sparkles size={18} />
           </Button>
@@ -659,6 +677,99 @@ export default function Home() {
           {toast}
         </button>
       )}
+      {showTutorial && (
+        <InteractiveTutorial
+          locale={locale}
+          onComplete={() => {
+            setShowTutorial(false);
+            completeTutorial();
+            setShowSpotlight(true);
+            setSpotlightStep(0);
+          }}
+          onSkip={() => {
+            setShowTutorial(false);
+            completeTutorial();
+            setShowSpotlight(true);
+            setSpotlightStep(0);
+          }}
+        />
+      )}
+      {/* Spotlight tour steps */}
+      <Spotlight
+        targetSelector='[data-tutorial-target="add"]'
+        isActive={showSpotlight && spotlightStep === 0}
+        title={locale === "ru" ? "Добавление привычек" : "Add Habits"}
+        description={
+          locale === "ru"
+            ? "Нажмите здесь, чтобы создать новую привычку. Задайте название, категорию и цель."
+            : "Click here to create a new habit. Set name, category and goal."
+        }
+        locale={locale}
+        stepNumber={1}
+        totalSteps={5}
+        onNext={() => setSpotlightStep(1)}
+        onSkip={() => setShowSpotlight(false)}
+      />
+      <Spotlight
+        targetSelector='[data-tutorial-target="nav-home"]'
+        isActive={showSpotlight && spotlightStep === 1}
+        title={locale === "ru" ? "Главный экран" : "Home Screen"}
+        description={
+          locale === "ru"
+            ? "Здесь находятся все ваши привычки. Отмечайте выполнение одним касанием."
+            : "All your habits are here. Mark completion with one tap."
+        }
+        locale={locale}
+        stepNumber={2}
+        totalSteps={5}
+        onNext={() => setSpotlightStep(2)}
+        onSkip={() => setShowSpotlight(false)}
+      />
+      <Spotlight
+        targetSelector='[data-tutorial-target="nav-progress"]'
+        isActive={showSpotlight && spotlightStep === 2}
+        title={locale === "ru" ? "Прогресс" : "Progress"}
+        description={
+          locale === "ru"
+            ? "Следите за статистикой, достижениями и динамикой выполнения."
+            : "Track statistics, achievements and completion dynamics."
+        }
+        locale={locale}
+        stepNumber={3}
+        totalSteps={5}
+        onNext={() => setSpotlightStep(3)}
+        onSkip={() => setShowSpotlight(false)}
+      />
+      <Spotlight
+        targetSelector='[data-tutorial-target="nav-practice"]'
+        isActive={showSpotlight && spotlightStep === 3}
+        title={locale === "ru" ? "Практика" : "Practice"}
+        description={
+          locale === "ru"
+            ? "Журнал для записей и якоря — ваши опоры в трудные моменты."
+            : "Journal for entries and anchors — your supports in tough moments."
+        }
+        locale={locale}
+        stepNumber={4}
+        totalSteps={5}
+        onNext={() => setSpotlightStep(4)}
+        onSkip={() => setShowSpotlight(false)}
+      />
+      <Spotlight
+        targetSelector='[data-tutorial-target="settings"]'
+        isActive={showSpotlight && spotlightStep === 4}
+        title={locale === "ru" ? "Настройки" : "Settings"}
+        description={
+          locale === "ru"
+            ? "Настройте тему, язык и включите демо-режим для изучения функций."
+            : "Customize theme, language and enable demo mode to explore features."
+        }
+        locale={locale}
+        stepNumber={5}
+        totalSteps={5}
+        onNext={() => setShowSpotlight(false)}
+        onSkip={() => setShowSpotlight(false)}
+      />
       <PWAInstallPrompt />
     </div>
   );
