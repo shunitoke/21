@@ -430,6 +430,7 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
             style={{
               boxShadow: "0 25px 50px rgba(0,0,0,0.4)",
               transform: "scale(1.03)",
+              transformOrigin: "center center",
             }}
           >
             <CardContent>
