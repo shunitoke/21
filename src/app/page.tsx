@@ -110,6 +110,12 @@ export default function Home() {
     return () => window.clearTimeout(timeout);
   }, [toast, clearToast]);
 
+  useEffect(() => {
+    if (!exitToast) return undefined;
+    const timeout = window.setTimeout(() => setExitToast(""), 2000);
+    return () => window.clearTimeout(timeout);
+  }, [exitToast]);
+
   useLayoutEffect(() => {
     const root = document.documentElement;
     const applyTheme = (mode: ThemePreference) => {
