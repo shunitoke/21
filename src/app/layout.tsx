@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
 import Script from "next/script";
 import { Fraunces, Manrope, Press_Start_2P } from "next/font/google";
 import "./globals.css";
@@ -79,18 +78,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = await cookies();
-  const themeCookie = cookieStore.get("program21.theme")?.value ?? "system";
-  const initialTheme = themeCookie === "dark" || themeCookie === "light" ? themeCookie : "light";
-  const initialBackground = initialTheme === "dark" ? "#0a0b0f" : "#ffffff";
-
   return (
     <html
       lang="ru"
       suppressHydrationWarning
-      data-theme={initialTheme}
-      data-appearance={initialTheme}
-      style={{ backgroundColor: initialBackground, colorScheme: initialTheme }}
+      data-theme="system"
+      data-appearance="system"
     >
       <head>
         <link
@@ -119,8 +112,8 @@ export default async function RootLayout({
     document.documentElement.style.backgroundColor = resolved === "dark" ? "#0a0b0f" : "#ffffff";
     document.documentElement.style.colorScheme = resolved;
   };
-  // Try to get theme from cookie first (set by server), then fallback
-  const cookieTheme = document.cookie.match(/program21\.theme=([^;]+)/)?.[1];
+  // Try to get theme from cookie first, then fallback
+  const cookieTheme = document.cookie.match(/program21\\.theme=([^;]+)/)?.[1];
   if (cookieTheme) {
     apply(cookieTheme);
   } else {

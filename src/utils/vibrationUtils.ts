@@ -1,3 +1,5 @@
+import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
+
 export const vibrationPatterns = {
   normal: [30, 40, 30],
   priority: [50, 60, 50, 30, 60],
@@ -26,15 +28,58 @@ if (typeof window !== "undefined") {
   window.addEventListener("keydown", setInteracted);
 }
 
-export const triggerVibration = (pattern: keyof typeof vibrationPatterns | number[]) => {
+export const triggerVibration = async (pattern: keyof typeof vibrationPatterns | number[]) => {
+  const isNative = typeof window !== "undefined" && typeof (window as any).Capacitor !== "undefined";
+  
+  if (isNative) {
+    try {
+      // Map patterns to appropriate haptic styles
+      const patternKey = typeof pattern === "string" ? pattern : "normal";
+      let style = ImpactStyle.Medium;
+      
+      switch (patternKey) {
+        case "ultraLight":
+        case "light":
+          style = ImpactStyle.Light;
+          break;
+        case "medium":
+        case "normal":
+          style = ImpactStyle.Medium;
+          break;
+        case "achievement":
+        case "important":
+        case "legendary":
+        case "priority":
+          style = ImpactStyle.Heavy;
+          break;
+        case "error":
+          await Haptics.notification({ type: NotificationType.Error });
+          return;
+        default:
+          style = ImpactStyle.Medium;
+      }
+      
+      await Haptics.impact({ style });
+      
+      // Double pulse for stronger patterns
+      if (["priority", "achievement", "legendary"].includes(patternKey)) {
+        setTimeout(() => Haptics.impact({ style }), 80);
+      }
+    } catch {
+      // Ignore haptics errors
+    }
+    return;
+  }
+
+  // Web fallback
   if (!navigator.vibrate) return;
-  if (!hasUserInteracted) return; // Браузер блокирует вибрацию без user gesture
+  if (!hasUserInteracted) return;
 
   const vibrationPattern = typeof pattern === "string" ? vibrationPatterns[pattern] : pattern;
   try {
     navigator.vibrate(vibrationPattern);
   } catch (e) {
-    // Игнорируем ошибки вибрации
+    // Ignore vibration errors
   }
 };
 
