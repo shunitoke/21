@@ -502,6 +502,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
   toggleDemoMode: (enabled: boolean) => {
     if (enabled) {
       const currentTheme = get().settings.theme;
+      const currentLocale = get().settings.locale;
       const tutorialCompleted = get().settings.tutorialCompleted;
       persistThemePreference(currentTheme);
       const mainSnapshot = {
@@ -513,7 +514,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
       };
       set({
         screen: "home",
-        settings: { ...demoSettings, theme: currentTheme, demoMode: true, tutorialCompleted },
+        settings: { ...demoSettings, theme: currentTheme, locale: currentLocale, demoMode: true, tutorialCompleted },
         habits: [...demoHabits, ...demoArchivedHabits],
         logs: demoLogs,
         journal: demoJournal,
@@ -528,7 +529,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
         if (demoData) {
           set({
             screen: "home",
-            settings: { ...demoData.settings, theme: currentTheme, demoMode: true, tutorialCompleted },
+            settings: { ...demoData.settings, theme: currentTheme, locale: currentLocale, demoMode: true, tutorialCompleted },
             habits: [...demoData.habits, ...demoArchivedHabits],
             logs: demoData.logs,
             journal: demoData.journal,
@@ -541,7 +542,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
         }
         await persistState(
           {
-            settings: { ...demoSettings, theme: currentTheme, demoMode: true, tutorialCompleted },
+            settings: { ...demoSettings, theme: currentTheme, locale: currentLocale, demoMode: true, tutorialCompleted },
             habits: [...demoHabits, ...demoArchivedHabits],
             logs: demoLogs,
             journal: demoJournal,
@@ -554,9 +555,10 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
     }
     void (async () => {
       const currentTheme = get().settings.theme;
+      const currentLocale = get().settings.locale;
       const mainData = await loadState();
       if (mainData) {
-        const nextSettings = { ...mainData.settings, demoMode: false, theme: currentTheme };
+        const nextSettings = { ...mainData.settings, demoMode: false, theme: currentTheme, locale: currentLocale };
         set({
           screen: "home",
           settings: nextSettings,
@@ -583,7 +585,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
       const settings = getDefaultSettings();
       set({
         screen: "home",
-        settings: { ...settings, theme: currentTheme, demoMode: false },
+        settings: { ...settings, theme: currentTheme, locale: currentLocale, demoMode: false },
         habits: defaultHabits,
         logs: [],
         journal: defaultJournal,
@@ -594,7 +596,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
       persistThemePreference(currentTheme);
       await persistState(
         {
-          settings: { ...settings, theme: currentTheme, demoMode: false },
+          settings: { ...settings, theme: currentTheme, locale: currentLocale, demoMode: false },
           habits: defaultHabits,
           logs: [],
           journal: defaultJournal,
@@ -932,8 +934,12 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
   },
   importData: (data: { settings: UserSettings; habits: Habit[]; logs: HabitLog[]; journal: JournalEntry[]; stopCrane: StopCraneItem[] }) => {
     const { settings, habits, logs, journal, stopCrane } = data;
+    // Preserve current theme and locale, only import other settings
+    const currentTheme = get().settings.theme;
+    const currentLocale = get().settings.locale;
+    const filteredSettings = { ...settings, theme: currentTheme, locale: currentLocale };
     set({
-      settings: { ...get().settings, ...settings },
+      settings: { ...get().settings, ...filteredSettings },
       habits,
       logs,
       journal,
@@ -942,7 +948,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
     });
     void persistState(
       {
-        settings: { ...get().settings, ...settings },
+        settings: { ...get().settings, ...filteredSettings },
         habits,
         logs,
         journal,

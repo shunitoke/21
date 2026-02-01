@@ -29,16 +29,22 @@ export function useBackButton({
 
   const handleBackButton = useCallback(() => {
     // Priority 0: Check for any open dialogs/modals in DOM (from any screen)
-    const openDialog = document.querySelector('[data-state="open"][data-slot="dialog-content"], [data-state="open"][data-slot="alert-dialog-content"]');
-    const openOverlay = document.querySelector('[data-state="open"][data-slot="dialog-overlay"], [data-state="open"][data-slot="alert-dialog-overlay"]');
-    if (openDialog || openOverlay) {
-      // Find the close button or trigger close
-      const closeButton = document.querySelector('[data-state="open"] button[data-slot="dialog-close"], [data-state="open"] [data-slot="dialog-close"]');
+    // Radix UI dialogs use CSS animations, so we check for overlay presence
+    const openOverlay = document.querySelector('[data-slot="dialog-overlay"], [data-slot="alert-dialog-overlay"]');
+    if (openOverlay) {
+      // Try to find close button and click it
+      const closeButton = document.querySelector('button[data-slot="dialog-close"], [data-slot="dialog-close"] button, button[aria-label="Close"]');
       if (closeButton) {
         (closeButton as HTMLElement).click();
       } else {
-        // Try to dispatch escape key to close modal
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27 }));
+        // Find cancel button for alert dialogs
+        const cancelButton = document.querySelector('[data-slot="alert-dialog-cancel"]');
+        if (cancelButton) {
+          (cancelButton as HTMLElement).click();
+        } else {
+          // Dispatch Escape key as fallback
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+        }
       }
       return;
     }
