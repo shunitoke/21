@@ -934,10 +934,11 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
   },
   importData: (data: { settings: UserSettings; habits: Habit[]; logs: HabitLog[]; journal: JournalEntry[]; stopCrane: StopCraneItem[] }) => {
     const { settings, habits, logs, journal, stopCrane } = data;
-    // Preserve current theme and locale, only import other settings
+    // Preserve current theme, locale, ally - only import other settings
     const currentTheme = get().settings.theme;
     const currentLocale = get().settings.locale;
-    const filteredSettings = { ...settings, theme: currentTheme, locale: currentLocale };
+    const currentAlly = get().settings.ally;
+    const filteredSettings = { ...settings, theme: currentTheme, locale: currentLocale, ally: currentAlly };
     set({
       settings: { ...get().settings, ...filteredSettings },
       habits,

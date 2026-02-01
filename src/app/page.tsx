@@ -403,7 +403,7 @@ export default function Home() {
     addStopCrane(item);
   };
 
-  const locale: Locale = background.settings.locale;
+  const locale: Locale = settings.locale;
 
   // Back button handling for Android
   useBackButton({

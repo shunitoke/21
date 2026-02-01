@@ -13,8 +13,12 @@ export const defaultSettings: UserSettings = {
 };
 
 export const demoSettings: UserSettings = {
-  ...defaultSettings,
+  id: "settings",
+  locale: "ru",
+  theme: "system",
+  ally: "friend",
   demoMode: true,
+  tutorialCompleted: false,
 };
 
 export const defaultHabits: Habit[] = [];
