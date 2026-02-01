@@ -352,7 +352,7 @@ const HabitModal = ({
                       }}
                       onDayClick={(day) => {
                         if (!habit) return;
-                        vibrationFeedback.priorityButtonPress();
+                        triggerVibration("important");
                         const iso = toISODate(day);
                         setSelectedDate(iso);
                         onToggleDate?.(habit.id, iso, targetValue);
