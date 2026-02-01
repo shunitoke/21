@@ -21,6 +21,8 @@ import { getThemePreference } from "@/services/storage";
 import { InteractiveTutorial } from "@/components/InteractiveTutorial";
 import { Spotlight, useSpotlightTour } from "@/components/Spotlight";
 import { vibrationFeedback } from "@/utils/vibrationUtils";
+import { useSafeArea } from "@/hooks/useSafeArea";
+import { useBackButton } from "@/hooks/useBackButton";
 
 export default function Home() {
   const [habitModalOpen, setHabitModalOpen] = useState(false);
@@ -34,6 +36,7 @@ export default function Home() {
   const [radioSrc, setRadioSrc] = useState<string | null>(null);
   const [radioPlaying, setRadioPlaying] = useState(false);
   const [radioBuffering, setRadioBuffering] = useState(false);
+  const [exitToast, setExitToast] = useState("");
   const radioAudioRef = useRef<HTMLAudioElement | null>(null);
   const pendingScrollResetRef = useRef(false);
   const didSwipeRef = useRef(false);
@@ -48,6 +51,7 @@ export default function Home() {
     settings: ReturnType<typeof useAppStore.getState>["settings"];
     loading: ReturnType<typeof useAppStore.getState>["loading"];
   } | null>(null);
+  const safeArea = useSafeArea();
   const {
     screen,
     setScreen,
@@ -401,6 +405,26 @@ export default function Home() {
 
   const locale: Locale = background.settings.locale;
 
+  // Back button handling for Android
+  useBackButton({
+    isModalOpen: habitModalOpen,
+    onCloseModal: () => {
+      setHabitModalOpen(false);
+      setSelectedHabit(null);
+    },
+    isSettingsOpen: settingsOpen,
+    onCloseSettings: () => setSettingsOpen(false),
+    canExit: true,
+    onExit: () => {
+      const isNative = typeof window !== "undefined" && typeof (window as any).Capacitor !== "undefined";
+      if (isNative) {
+        import("@capacitor/app").then(({ App }) => App.exitApp());
+      }
+    },
+    exitMessage: locale === "ru" ? "Нажмите ещё раз для выхода" : "Press again to exit",
+    onShowToast: setExitToast,
+  });
+
   const screenVariants = useMemo(
     () => ({
       enter: (direction: number) => ({
@@ -430,7 +454,7 @@ export default function Home() {
 
   if (background.loading) {
     return (
-      <div className="app-root flex min-h-[100svh] items-center justify-center bg-background px-4 pb-28 pt-6 text-foreground">
+      <div className="app-root flex min-h-[100svh] items-center justify-center bg-background px-4 pb-28 pt-[max(24px,env(safe-area-inset-top))] text-foreground">
         <Loader2 className="h-8 w-8 animate-spin text-foreground/70" aria-label={locale === "ru" ? "Загрузка" : "Loading"} />
       </div>
     );
@@ -438,7 +462,7 @@ export default function Home() {
 
   return (
     <div
-      className="app-root flex min-h-[100svh] flex-col w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-6 text-foreground"
+      className="app-root flex min-h-[100svh] flex-col w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-[max(24px,env(safe-area-inset-top))] text-foreground"
       style={{ maxWidth: '100vw', overflowX: 'hidden', touchAction: 'pan-y' }}
       onClickCapture={(event) => {
         if (!didSwipeRef.current) return;
@@ -693,6 +717,11 @@ export default function Home() {
         >
           {toast}
         </button>
+      )}
+      {exitToast && (
+        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full border border-border bg-popover px-4 py-2 text-xs text-popover-foreground shadow-lg">
+          {exitToast}
+        </div>
       )}
       {showTutorial && (
         <InteractiveTutorial
