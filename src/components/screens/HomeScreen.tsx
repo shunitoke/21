@@ -193,7 +193,7 @@ const SortableHabitCard = memo(function SortableHabitCard({
                 const target = Math.max(1, habit.dailyTarget ?? 1);
                 let nextShake: "step" | "complete" | "reset" = "step";
                 if (!log) {
-                  nextShake = "step";
+                  nextShake = target === 1 ? "complete" : "step";
                 } else if (currentCount >= target) {
                   nextShake = "reset";
                 } else if (currentCount + 1 >= target) {
