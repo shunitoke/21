@@ -224,9 +224,8 @@ const HabitModal = ({
             className
           )}
           style={mergedStyle}
-          onClick={(event) => {
-            buttonProps.onClick?.(event);
-            vibrationFeedback.buttonPress();
+          onPointerDown={() => {
+            vibrationFeedback.priorityButtonPress();
           }}
         >
           <span>{children}</span>
