@@ -26,6 +26,18 @@ interface JournalModalProps {
   onSubmit: (entry: JournalEntry) => void;
 }
 
+const getSupportedMimeType = (): string => {
+  const types = ['audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg', 'audio/wav'];
+  for (const type of types) {
+    if (MediaRecorder.isTypeSupported(type)) {
+      console.log('[Audio] Supported MIME type:', type);
+      return type;
+    }
+  }
+  console.log('[Audio] No specific MIME type supported, using default');
+  return '';
+};
+
 const formatDuration = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
@@ -61,12 +73,36 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
   const recorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const recordingRef = useRef(false);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const requestMicrophonePermission = async (): Promise<boolean> => {
+    try {
+      // Try using Permissions API first (works on Android WebView with Chrome 64+)
+      if (navigator.permissions && navigator.permissions.query) {
+        const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+        if (result.state === 'granted') {
+          return true;
+        }
+        if (result.state === 'prompt') {
+          // Will request on getUserMedia call
+          return true;
+        }
+      }
+      return true;
+    } catch (e) {
+      console.log('[Audio] Permissions API not supported, falling back to getUserMedia');
+      return true;
+    }
+  };
   const maxChars = 1000;
 
   const stopRecording = useCallback(() => {
     const activeRecorder = recorderRef.current;
     if (activeRecorder && activeRecorder.state !== "inactive") {
-      activeRecorder.stop();
+      try {
+        activeRecorder.stop();
+      } catch (e) {
+        console.error('[Audio] Error stopping recorder:', e);
+      }
     }
     activeRecorder?.stream?.getTracks().forEach((track) => track.stop());
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -107,6 +143,7 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
     setAudioUrl(null);
     setRecording(false);
     setRecorder(null);
+    setRecordingError(null);
   }, [open, stopRecording]);
 
   useEffect(() => {
@@ -134,45 +171,90 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
 
   useEffect(() => {
     if (!recording || recorder) return;
+    setRecordingError(null);
+    
+    // Check if MediaRecorder is supported
+    if (!window.MediaRecorder) {
+      setRecordingError('MediaRecorder not supported in this WebView');
+      setRecording(false);
+      return;
+    }
+    
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
         streamRef.current = stream;
-        // Setup Web Audio API for visualization
-        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const source = audioCtx.createMediaStreamSource(stream);
-        const analyserNode = audioCtx.createAnalyser();
-        analyserNode.fftSize = 512;
-        analyserNode.smoothingTimeConstant = 0.7;
-        source.connect(analyserNode);
         
-        audioContextRef.current = audioCtx;
-        setAudioContext(audioCtx);
-        setAnalyser(analyserNode);
-
-        // Setup MediaRecorder
-        const mediaRecorder = new MediaRecorder(stream);
+        // Try to create MediaRecorder with various options
+        let mediaRecorder: MediaRecorder;
+        const mimeType = getSupportedMimeType();
+        
+        try {
+          mediaRecorder = mimeType 
+            ? new MediaRecorder(stream, { mimeType })
+            : new MediaRecorder(stream);
+          console.log('[Audio] MediaRecorder created, mimeType:', mediaRecorder.mimeType || 'default');
+        } catch (e) {
+          console.error('[Audio] Failed to create MediaRecorder:', e);
+          setRecordingError('Failed to create recorder: ' + (e as Error).message);
+          setRecording(false);
+          return;
+        }
         recorderRef.current = mediaRecorder;
         const chunks: Blob[] = [];
-        mediaRecorder.ondataavailable = (event) => chunks.push(event.data);
+        
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            chunks.push(event.data);
+          }
+        };
+        
         mediaRecorder.onstop = () => {
-          const blob = new Blob(chunks, { type: "audio/webm" });
+          if (chunks.length === 0) {
+            console.error('[Audio] No data recorded');
+            setRecordingError('No audio data recorded');
+            return;
+          }
+          const blobType = mediaRecorder.mimeType || 'audio/webm';
+          const blob = new Blob(chunks, { type: blobType });
           const reader = new FileReader();
           reader.onloadend = () => {
             if (typeof reader.result === "string") {
               setAudioUrl(reader.result);
             }
           };
+          reader.onerror = (e) => {
+            console.error('[Audio] FileReader error:', e);
+            setRecordingError('Failed to process audio');
+          };
           reader.readAsDataURL(blob);
         };
-        mediaRecorder.start();
-        setRecorder(mediaRecorder);
+        
+        mediaRecorder.onerror = (e) => {
+          console.error('[Audio] MediaRecorder error:', e);
+          setRecordingError('Recording error: ' + (e as ErrorEvent).message);
+          setRecording(false);
+        };
+        
+        try {
+          mediaRecorder.start(100); // Request data every 100ms for better compatibility
+          console.log('[Audio] MediaRecorder started, state:', mediaRecorder.state);
+          setRecorder(mediaRecorder);
+        } catch (e) {
+          console.error('[Audio] Failed to start MediaRecorder:', e);
+          setRecordingError('Failed to start: ' + (e as Error).message);
+          setRecording(false);
+          return;
+        }
+        
         // Start duration timer
         durationIntervalRef.current = setInterval(() => {
           setRecordingDuration(prev => prev + 1);
         }, 1000);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('[Audio] Recording failed:', err);
+        setRecordingError('Microphone access failed: ' + err.message);
         setRecording(false);
       });
   }, [recording, recorder]);
@@ -302,6 +384,9 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
                 </span>
               )}
             </div>
+            {recordingError && (
+              <p className="text-xs text-red-500 mt-2">{recordingError}</p>
+            )}
             {recording && <p className="text-xs text-muted-foreground">{t("recording", locale)}</p>}
             {audioUrl && <AudioAnchor src={audioUrl} locale={locale} />}
           </Card>
