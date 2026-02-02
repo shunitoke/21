@@ -87,6 +87,46 @@ export const dictionary: Dictionary = {
     ru: "Попробуйте все возможности приложения с демонстрационными данными",
     en: "Try all app features with demonstration data",
   },
+  notifications: {
+    ru: "Уведомления",
+    en: "Notifications",
+  },
+  notificationsHint: {
+    ru: "Союзник будет присылать напоминания и поддержку",
+    en: "Your ally will send reminders and support",
+  },
+  notificationsEnabled: {
+    ru: "Включить уведомления",
+    en: "Enable notifications",
+  },
+  notificationFrequency: {
+    ru: "Настойчивость",
+    en: "Persistence",
+  },
+  notificationFrequencyRare: {
+    ru: "Редко",
+    en: "Rare",
+  },
+  notificationFrequencyNormal: {
+    ru: "Нормально",
+    en: "Normal",
+  },
+  notificationFrequencyPersistent: {
+    ru: "Настойчиво",
+    en: "Persistent",
+  },
+  notificationTimeWindow: {
+    ru: "Время уведомлений",
+    en: "Notification time",
+  },
+  notificationFrom: {
+    ru: "С",
+    en: "From",
+  },
+  notificationTo: {
+    ru: "До",
+    en: "To",
+  },
   archivedHabits: {
     ru: "Архив",
     en: "Archived",
@@ -594,6 +634,18 @@ export const dictionary: Dictionary = {
   close: {
     ru: "Закрыть",
     en: "Close",
+  },
+  community: {
+    ru: "Сообщество",
+    en: "Community",
+  },
+  communityHint: {
+    ru: "Присоединяйтесь к нашему Telegram-каналу для поддержки и обновлений",
+    en: "Join our Telegram channel for support and updates",
+  },
+  joinCommunity: {
+    ru: "Присоединиться",
+    en: "Join",
   },
 };
 

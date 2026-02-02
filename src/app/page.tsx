@@ -7,7 +7,7 @@ import { Home as HomeIcon, LineChart, Loader2, Plus, Settings, Sparkles } from "
 import HomeScreen from "@/components/screens/HomeScreen";
 import ProgressScreen from "@/components/screens/ProgressScreen";
 import PracticeScreen from "@/components/screens/PracticeScreen";
-import SettingsScreen from "@/components/screens/SettingsScreen";
+import SettingsScreen from "@/components/settings/SettingsScreen";
 import HabitModal from "@/components/HabitModal";
 import type { Habit, HabitCategoryId, JournalEntry, Locale, StopCraneItem, ThemePreference } from "@/lib/types";
 import { t } from "@/lib/i18n";
@@ -23,6 +23,8 @@ import { Spotlight, useSpotlightTour } from "@/components/Spotlight";
 import { vibrationFeedback } from "@/utils/vibrationUtils";
 import { useSafeArea } from "@/hooks/useSafeArea";
 import { useBackButton } from "@/hooks/useBackButton";
+import { requestNotificationPermission, scheduleNotifications } from "@/services/notifications";
+import packageInfo from "../../package.json";
 
 export default function Home() {
   const [habitModalOpen, setHabitModalOpen] = useState(false);
@@ -86,6 +88,37 @@ export default function Home() {
   useEffect(() => {
     void init();
   }, [init]);
+
+  // Request notification permissions and schedule on init
+  useEffect(() => {
+    if (loading) return;
+
+    const setupNotifications = async () => {
+      const notifSettings = settings.notificationSettings;
+      if (!notifSettings?.enabled) return;
+
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        await scheduleNotifications(notifSettings, settings.ally, habits, logs);
+      }
+    };
+
+    void setupNotifications();
+  }, [loading, settings.notificationSettings, settings.ally, habits, logs]);
+
+  // Reschedule notifications when settings change
+  useEffect(() => {
+    if (loading) return;
+
+    const notifSettings = settings.notificationSettings;
+    if (!notifSettings?.enabled) return;
+
+    const reschedule = async () => {
+      await scheduleNotifications(notifSettings, settings.ally, habits, logs);
+    };
+
+    void reschedule();
+  }, [settings.notificationSettings, settings.ally, habits, logs, loading]);
 
   useEffect(() => {
     // Show tutorial on first launch if not completed
@@ -707,6 +740,7 @@ export default function Home() {
               locale={locale}
               settings={settings}
               habits={habits}
+              appVersion={packageInfo.version}
               onUpdate={updateSettings}
               onRestore={restoreHabit}
               onDelete={removeHabit}

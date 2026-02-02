@@ -1,6 +1,15 @@
 export type Locale = "ru" | "en";
 export type ThemePreference = "system" | "light" | "dark";
 export type AllyTone = "friend" | "coach";
+export type NotificationFrequency = "rare" | "normal" | "persistent";
+
+export interface NotificationSettings {
+  enabled: boolean;
+  frequency: NotificationFrequency;
+  startHour: number; // 0-23, default 9
+  endHour: number; // 0-23, default 22
+}
+
 export type Screen = "home" | "progress" | "practice" | "settings";
 export type HabitCategoryId =
   | "health"
@@ -22,6 +31,7 @@ export interface UserSettings {
   ally: AllyTone;
   demoMode?: boolean;
   tutorialCompleted?: boolean;
+  notificationSettings?: NotificationSettings;
 }
 
 export interface Habit {

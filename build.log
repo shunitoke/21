@@ -1,0 +1,26 @@
+
+> 21@0.9.1 build
+> next build
+
+тЦ▓ Next.js 16.1.5 (Turbopack)
+- Experiments (use with caution):
+  ┬╖ optimizePackageImports
+
+  Creating an optimized production build ...
+тЬУ Compiled successfully in 15.0s
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/4) ...
+  Generating static pages using 7 workers (1/4) 
+  Generating static pages using 7 workers (2/4) 
+  Generating static pages using 7 workers (3/4) 
+тЬУ Generating static pages using 7 workers (4/4) in 1455.0ms
+  Finalizing page optimization ...
+
+Route (app)
+тФМ тЧЛ /
+тФФ тЧЛ /_not-found
+
+
+тЧЛ  (Static)  prerendered as static content
+

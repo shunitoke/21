@@ -10,6 +10,12 @@ export const defaultSettings: UserSettings = {
   ally: "friend",
   demoMode: true,
   tutorialCompleted: false,
+  notificationSettings: {
+    enabled: false,
+    frequency: "normal",
+    startHour: 9,
+    endHour: 22,
+  },
 };
 
 export const demoSettings: UserSettings = {
@@ -19,6 +25,12 @@ export const demoSettings: UserSettings = {
   ally: "friend",
   demoMode: true,
   tutorialCompleted: false,
+  notificationSettings: {
+    enabled: false,
+    frequency: "normal",
+    startHour: 9,
+    endHour: 22,
+  },
 };
 
 export const defaultHabits: Habit[] = [];
