@@ -18,6 +18,8 @@ import { Textarea } from "@/components/ui/textarea";
 import AudioAnchor from "@/components/AudioAnchor";
 import EmotionSelector from "@/components/EmotionSelector";
 import { vibrationFeedback, triggerVibration } from "@/utils/vibrationUtils";
+import { VoiceRecorder } from "capacitor-voice-recorder";
+import { Capacitor } from "@capacitor/core";
 
 interface JournalModalProps {
   open: boolean;
@@ -74,28 +76,39 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
   const audioContextRef = useRef<AudioContext | null>(null);
   const recordingRef = useRef(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
-  const requestMicrophonePermission = async (): Promise<boolean> => {
-    try {
-      // Try using Permissions API first (works on Android WebView with Chrome 64+)
-      if (navigator.permissions && navigator.permissions.query) {
-        const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-        if (result.state === 'granted') {
-          return true;
-        }
-        if (result.state === 'prompt') {
-          // Will request on getUserMedia call
-          return true;
-        }
-      }
-      return true;
-    } catch (e) {
-      console.log('[Audio] Permissions API not supported, falling back to getUserMedia');
-      return true;
-    }
-  };
+  const [isNative, setIsNative] = useState(false);
+
+  // Detect if running on native platform
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
+
   const maxChars = 1000;
 
-  const stopRecording = useCallback(() => {
+  const stopRecording = useCallback(async () => {
+    // Handle native recording
+    if (isNative) {
+      try {
+        const result = await VoiceRecorder.stopRecording();
+        if (result.value && result.value.recordDataBase64) {
+          // Convert base64 to data URL
+          const mimeType = 'audio/aac';
+          const dataUrl = `data:${mimeType};base64,${result.value.recordDataBase64}`;
+          setAudioUrl(dataUrl);
+        }
+      } catch (e) {
+        console.error('[Audio] Native stop recording error:', e);
+      }
+      setRecording(false);
+      setRecordingDuration(0);
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Handle web recording (PWA)
     const activeRecorder = recorderRef.current;
     if (activeRecorder && activeRecorder.state !== "inactive") {
       try {
@@ -126,7 +139,7 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
     setAudioContext(null);
     setAnalyser(null);
     setSpectrumData(new Array(20).fill(8));
-  }, []);
+  }, [isNative]);
 
   const handleClose = useCallback(() => {
     stopRecording();
@@ -172,25 +185,58 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
   useEffect(() => {
     if (!recording || recorder) return;
     setRecordingError(null);
-    
-    // Check if MediaRecorder is supported
+
+    // Use native voice recorder on Capacitor
+    if (isNative) {
+      const startNativeRecording = async () => {
+        try {
+          // Check and request permission
+          const permResult = await VoiceRecorder.hasAudioRecordingPermission();
+          if (!permResult.value) {
+            const requestResult = await VoiceRecorder.requestAudioRecordingPermission();
+            if (!requestResult.value) {
+              setRecordingError('Microphone permission denied');
+              setRecording(false);
+              return;
+            }
+          }
+
+          // Start recording
+          await VoiceRecorder.startRecording();
+          console.log('[Audio] Native recording started');
+
+          // Start duration timer
+          durationIntervalRef.current = setInterval(() => {
+            setRecordingDuration(prev => prev + 1);
+          }, 1000);
+        } catch (e) {
+          console.error('[Audio] Native recording failed:', e);
+          setRecordingError('Recording failed: ' + (e as Error).message);
+          setRecording(false);
+        }
+      };
+      startNativeRecording();
+      return;
+    }
+
+    // Web recording (PWA) - original logic
     if (!window.MediaRecorder) {
       setRecordingError('MediaRecorder not supported in this WebView');
       setRecording(false);
       return;
     }
-    
+
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
         streamRef.current = stream;
-        
+
         // Try to create MediaRecorder with various options
         let mediaRecorder: MediaRecorder;
         const mimeType = getSupportedMimeType();
-        
+
         try {
-          mediaRecorder = mimeType 
+          mediaRecorder = mimeType
             ? new MediaRecorder(stream, { mimeType })
             : new MediaRecorder(stream);
           console.log('[Audio] MediaRecorder created, mimeType:', mediaRecorder.mimeType || 'default');
@@ -202,13 +248,13 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
         }
         recorderRef.current = mediaRecorder;
         const chunks: Blob[] = [];
-        
+
         mediaRecorder.ondataavailable = (event) => {
           if (event.data && event.data.size > 0) {
             chunks.push(event.data);
           }
         };
-        
+
         mediaRecorder.onstop = () => {
           if (chunks.length === 0) {
             console.error('[Audio] No data recorded');
@@ -229,13 +275,13 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
           };
           reader.readAsDataURL(blob);
         };
-        
+
         mediaRecorder.onerror = (e) => {
           console.error('[Audio] MediaRecorder error:', e);
           setRecordingError('Recording error: ' + (e as ErrorEvent).message);
           setRecording(false);
         };
-        
+
         try {
           mediaRecorder.start(100); // Request data every 100ms for better compatibility
           console.log('[Audio] MediaRecorder started, state:', mediaRecorder.state);
@@ -246,7 +292,7 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
           setRecording(false);
           return;
         }
-        
+
         // Start duration timer
         durationIntervalRef.current = setInterval(() => {
           setRecordingDuration(prev => prev + 1);
@@ -257,7 +303,7 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
         setRecordingError('Microphone access failed: ' + err.message);
         setRecording(false);
       });
-  }, [recording, recorder]);
+  }, [recording, recorder, isNative]);
 
   useEffect(() => {
     if (!analyser || !recording || !isPageVisible) {
@@ -350,10 +396,10 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
                 size="xs"
                 variant={recording ? "destructive" : "outline"}
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   if (recording) {
                     triggerVibration("important");
-                    stopRecording();
+                    await stopRecording();
                     return;
                   }
                   if (audioUrl) setAudioUrl(null);
