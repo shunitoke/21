@@ -46,6 +46,35 @@ const formatDuration = (seconds: number): string => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
+// Simulated spectrum component for native recording (no real audio data available)
+const NativeSpectrum = () => {
+  const [heights, setHeights] = useState<number[]>([4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]);
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHeights(prev => prev.map(() => {
+        // Random height between 4 and 20px with some smoothing
+        const target = 4 + Math.random() * 16;
+        return target;
+      }));
+    }, 80);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  return (
+    <>
+      {heights.map((h, i) => (
+        <div
+          key={i}
+          className="w-[3px] bg-red-500 rounded-full transition-all duration-75"
+          style={{ height: `${Math.max(4, Math.min(20, h))}px` }}
+        />
+      ))}
+    </>
+  );
+};
+
 const usePageVisibility = () => {
   const [isVisible, setIsVisible] = useState(() => (typeof document === "undefined" ? true : !document.hidden));
 
@@ -247,6 +276,21 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
           return;
         }
         recorderRef.current = mediaRecorder;
+
+        // Create AudioContext and Analyser for spectrum visualization
+        try {
+          const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+          audioContextRef.current = audioCtx;
+          const source = audioCtx.createMediaStreamSource(stream);
+          const anal = audioCtx.createAnalyser();
+          anal.fftSize = 256;
+          source.connect(anal);
+          setAudioContext(audioCtx);
+          setAnalyser(anal);
+        } catch (e) {
+          console.error('[Audio] Failed to create audio context:', e);
+        }
+
         const chunks: Blob[] = [];
 
         mediaRecorder.ondataavailable = (event) => {
@@ -412,16 +456,22 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
               </Button>
               {recording && (
                 <div className="flex-1 flex items-center justify-center gap-[3px] h-6 px-2">
-                  {[0.3, 0.5, 0.7, 0.4, 0.9, 0.6, 0.8, 0.5, 0.7, 0.4, 0.6, 0.8, 0.5, 0.7, 0.4].map((peak, i) => {
-                    const h = 4 + (spectrumData[i % spectrumData.length] / 48) * 20 * peak;
-                    return (
-                      <div
-                        key={i}
-                        className="w-[3px] bg-red-500 rounded-full"
-                        style={{ height: `${Math.max(4, Math.min(20, h))}px` }}
-                      />
-                    );
-                  })}
+                  {isNative ? (
+                    // Simulated spectrum for native recording (no real data available)
+                    <NativeSpectrum />
+                  ) : (
+                    // Real spectrum visualization for web recording
+                    [0.3, 0.5, 0.7, 0.4, 0.9, 0.6, 0.8, 0.5, 0.7, 0.4, 0.6, 0.8, 0.5, 0.7, 0.4].map((peak, i) => {
+                      const h = 4 + (spectrumData[i % spectrumData.length] / 48) * 20 * peak;
+                      return (
+                        <div
+                          key={i}
+                          className="w-[3px] bg-red-500 rounded-full"
+                          style={{ height: `${Math.max(4, Math.min(20, h))}px` }}
+                        />
+                      );
+                    })
+                  )}
                 </div>
               )}
               {recording && (

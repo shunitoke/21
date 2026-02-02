@@ -1,9 +1,7 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
-import { Home as HomeIcon, LineChart, Loader2, Plus, Settings, Sparkles } from "lucide-react";
+import { Home as HomeIcon, LineChart, Plus, Settings, Sparkles } from "lucide-react";
 import HomeScreen from "@/components/screens/HomeScreen";
 import ProgressScreen from "@/components/screens/ProgressScreen";
 import PracticeScreen from "@/components/screens/PracticeScreen";
@@ -34,11 +32,11 @@ export default function Home() {
   const [showSpotlight, setShowSpotlight] = useState(false);
   const [spotlightStep, setSpotlightStep] = useState(0);
   const [hasDialogOverlay, setHasDialogOverlay] = useState(false);
-  const [transitionDir, setTransitionDir] = useState(0);
   const [radioSrc, setRadioSrc] = useState<string | null>(null);
   const [radioPlaying, setRadioPlaying] = useState(false);
   const [radioBuffering, setRadioBuffering] = useState(false);
   const [exitToast, setExitToast] = useState("");
+  const [isReady, setIsReady] = useState(false);
   const radioAudioRef = useRef<HTMLAudioElement | null>(null);
   const pendingScrollResetRef = useRef(false);
   const didSwipeRef = useRef(false);
@@ -89,6 +87,15 @@ export default function Home() {
     void init();
   }, [init]);
 
+  // Smooth fade-in when data is loaded to avoid partial rendering flicker
+  useEffect(() => {
+    if (!loading && !isReady) {
+      // Small delay to ensure all components are mounted
+      const timer = setTimeout(() => setIsReady(true), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, isReady]);
+
   // Request notification permissions and schedule on init
   useEffect(() => {
     if (loading) return;
@@ -135,6 +142,18 @@ export default function Home() {
 
   useEffect(() => {
     pendingScrollResetRef.current = true;
+  }, [screen]);
+
+  // Scroll reset after screen transition completes
+  useEffect(() => {
+    if (!pendingScrollResetRef.current) return;
+    const timer = setTimeout(() => {
+      pendingScrollResetRef.current = false;
+      const root = document.querySelector<HTMLDivElement>(".app-root");
+      if (root) root.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }, 250); // Match transition duration
+    return () => clearTimeout(timer);
   }, [screen]);
 
   useEffect(() => {
@@ -267,8 +286,6 @@ export default function Home() {
       if (currentIndex === -1) return;
       const clamped = Math.max(0, Math.min(mainScreens.length - 1, nextIndex));
       if (clamped === currentIndex) return;
-      const dir = Math.sign(clamped - currentIndex);
-      flushSync(() => setTransitionDir(dir));
       setScreen(mainScreens[clamped]);
     },
     [mainScreenIndex, mainScreens, screen, setScreen]
@@ -276,17 +293,9 @@ export default function Home() {
 
   const setScreenWithDirection = useCallback(
     (next: ReturnType<typeof useAppStore.getState>["screen"]) => {
-      const from = mainScreenIndex(screen);
-      const to = mainScreenIndex(next);
-      if (from !== -1 && to !== -1) {
-        const dir = Math.sign(to - from);
-        flushSync(() => setTransitionDir(dir));
-      } else {
-        flushSync(() => setTransitionDir(0));
-      }
       setScreen(next);
     },
-    [mainScreenIndex, screen, setScreen]
+    [setScreen]
   );
 
   useEffect(() => {
@@ -464,23 +473,6 @@ export default function Home() {
     onShowToast: setExitToast,
   });
 
-  const screenVariants = useMemo(
-    () => ({
-      enter: (direction: number) => ({
-        x: direction === 0 ? "0%" : direction > 0 ? "100%" : "-100%",
-        opacity: 1,
-        position: "relative" as const,
-      }),
-      center: { x: "0%", opacity: 1, position: "relative" as const },
-      exit: (direction: number) => ({
-        x: direction === 0 ? "0%" : direction > 0 ? "-100%" : "100%",
-        opacity: 1,
-        position: "absolute" as const,
-      }),
-    }),
-    []
-  );
-
   const handleSwipe = useCallback(
     (delta: number) => {
       if (hasDialogOverlay) return;
@@ -491,17 +483,9 @@ export default function Home() {
     [goToMainIndex, hasDialogOverlay, mainScreenIndex, screen]
   );
 
-  if (background.loading) {
-    return (
-      <div className="app-root flex min-h-[100svh] items-center justify-center bg-background px-4 pb-28 pt-[max(24px,env(safe-area-inset-top))] text-foreground">
-        <Loader2 className="h-8 w-8 animate-spin text-foreground/70" aria-label={locale === "ru" ? "Загрузка" : "Loading"} />
-      </div>
-    );
-  }
-
   return (
     <div
-      className="app-root flex min-h-[100svh] flex-col w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-[max(24px,env(safe-area-inset-top))] text-foreground"
+      className={`app-root flex min-h-[100svh] flex-col w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-[max(24px,env(safe-area-inset-top))] text-foreground transition-opacity duration-150 ${isReady ? 'opacity-100' : 'opacity-0'}`}
       style={{ maxWidth: '100vw', overflowX: 'hidden', touchAction: 'pan-y' }}
       onClickCapture={(event) => {
         if (!didSwipeRef.current) return;
@@ -598,33 +582,19 @@ export default function Home() {
           dragStartXRef.current = null;
         }}
       >
-        <AnimatePresence
-          initial={true}
-          custom={transitionDir}
-          onExitComplete={() => {
-            if (!pendingScrollResetRef.current) return;
-            pendingScrollResetRef.current = false;
-            const root = document.querySelector<HTMLDivElement>(".app-root");
-            if (root) root.scrollTo({ top: 0, left: 0, behavior: "auto" });
-            window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        {/* CSS-based screen transitions - all screens always rendered for instant switching */}
+        <div
+          className="screens-container"
+          style={{
+            display: 'flex',
+            width: '300%',
+            height: '100%',
+            transform: `translateX(${mainScreenIndex(background.screen) * -33.333}%)`,
+            transition: 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)',
+            willChange: 'transform',
           }}
         >
-        <motion.div
-          key={background.screen}
-          custom={transitionDir}
-          variants={screenVariants}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          className="w-full flex-1"
-          transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-          drag={background.screen === "home" || background.screen === "progress" || background.screen === "practice" ? "x" : false}
-          dragListener={false}
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.12}
-          style={{ touchAction: "pan-y" }}
-        >
-          {background.screen === "home" && (
+          <div className="screen-panel w-full h-full flex-shrink-0" style={{ width: '33.333%' }}>
             <HomeScreen
               locale={locale}
               habits={background.sortedHabits}
@@ -640,8 +610,8 @@ export default function Home() {
               }}
               onReorderHabits={handleReorderHabits}
             />
-          )}
-          {background.screen === "progress" && (
+          </div>
+          <div className="screen-panel w-full h-full flex-shrink-0" style={{ width: '33.333%' }}>
             <ProgressScreen
               locale={locale}
               habits={background.sortedHabits}
@@ -650,8 +620,8 @@ export default function Home() {
               journal={background.journal}
               isActive={background.screen === "progress"}
             />
-          )}
-          {background.screen === "practice" && (
+          </div>
+          <div className="screen-panel w-full h-full flex-shrink-0" style={{ width: '33.333%' }}>
             <PracticeScreen
               locale={locale}
               journal={background.journal}
@@ -666,9 +636,8 @@ export default function Home() {
               radioBuffering={radioBuffering}
               onToggleRadio={handleToggleRadio}
             />
-          )}
-        </motion.div>
-      </AnimatePresence>
+          </div>
+        </div>
       </div>
       <audio ref={radioAudioRef} preload="none" />
       <nav className="fixed inset-x-0 bottom-4 z-40 flex justify-center">

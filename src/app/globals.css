@@ -323,6 +323,28 @@ html {
   max-width: 100vw;
 }
 
+/* GPU-accelerated screen container */
+.screens-container {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Optimize screen panels for GPU rendering */
+.screen-panel {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Reduce paint cost for off-screen panels */
+.screen-panel {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+  contain: layout style paint;
+}
+
 /* Allow horizontal swipes to pass through to screen navigation */
 [data-slot="chart"],
 [data-slot="carousel"],
