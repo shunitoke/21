@@ -4,6 +4,16 @@ const path = require('path');
 
 const androidAssetsPath = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'assets', 'public');
 
+// Step 0: Increment build version
+console.log('🔢 Incrementing build version...');
+const packagePath = path.join(__dirname, '..', 'package.json');
+const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+const versionParts = packageJson.version.split('.');
+versionParts[2] = String(parseInt(versionParts[2]) + 1);
+packageJson.version = versionParts.join('.');
+fs.writeFileSync(packagePath, JSON.stringify(packageJson, null, 2) + '\n', 'utf8');
+console.log(`✓ Version updated to ${packageJson.version}`);
+
 // Step 1: Clean android assets
 console.log('🧹 Cleaning Android assets...');
 if (fs.existsSync(androidAssetsPath)) {

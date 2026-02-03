@@ -12,10 +12,10 @@ import {
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
+  MeasuringStrategy,
   DragOverlay,
-  defaultDropAnimationSideEffects,
-  type DropAnimation,
 } from "@dnd-kit/core";
+import { createPortal } from "react-dom";
 import {
   arrayMove,
   SortableContext,
@@ -23,7 +23,7 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Check, Flame, Plus, Star, Tag } from "lucide-react";
+import { Check, Flame, Loader2, Plus, Star, Tag } from "lucide-react";
 import type { Habit, HabitLog, Locale } from "@/lib/types";
 import { t } from "@/lib/i18n";
 import { getTodayISO } from "@/lib/date";
@@ -39,6 +39,7 @@ interface HomeScreenProps {
   locale: Locale;
   habits: Habit[];
   logs: HabitLog[];
+  isLoading?: boolean;
   onToggle: (habitId: string, isPriority: boolean, dailyTarget?: number) => void;
   onOpen: (habit: Habit) => void;
   onAdd: () => void;
@@ -54,14 +55,27 @@ const getFlameCount = (weeks: number) => {
   return 0;
 };
 
+const EMPTY_LOGS: HabitLog[] = [];
+
+// Custom modifier to compensate for scroll position in DragOverlay
+const scrollCompensationModifier: Modifier = ({ transform, active, activatorEvent }) => {
+  if (!active) return transform;
+  
+  // Get the scroll position of the app root container
+  const root = document.querySelector<HTMLDivElement>(".app-root");
+  const scrollTop = root ? root.scrollTop : window.scrollY;
+  
+  return {
+    ...transform,
+    y: transform.y - scrollTop,
+  };
+};
+
 const getShakeClass = (shake?: "step" | "complete" | "reset" | null) => {
   if (shake === "complete") return "animate-habit-shake-strong";
   if (shake) return "animate-habit-shake";
   return "";
 };
-
-// Стабильный пустой массив для предотвращения лишних рендеров
-const EMPTY_LOGS: HabitLog[] = [];
 
 const buildLogsByHabit = (logs: HabitLog[]) => {
   const map = new Map<string, HabitLog[]>();
@@ -104,6 +118,7 @@ const SortableHabitCard = memo(function SortableHabitCard({
     transform,
     transition,
     isDragging: isSortableDragging,
+    active,
   } = useSortable({ 
     id: habit.id,
     transition: {
@@ -112,13 +127,15 @@ const SortableHabitCard = memo(function SortableHabitCard({
     },
   });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isSortableDragging ? 9999 : 1,
-    position: "relative" as const,
-    opacity: isSortableDragging ? 0 : 1,
-  };
+  const style = useMemo(() => {
+    return {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      zIndex: isSortableDragging ? 9999 : 1,
+      position: 'relative' as const,
+      opacity: 1,
+    };
+  }, [isSortableDragging, transform, transition]);
 
   const today = getTodayISO();
   const log = habitLogs.find((entry) => entry.date === today);
@@ -267,7 +284,7 @@ const SortableHabitCard = memo(function SortableHabitCard({
   return true;
 });
 
-const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHabits }: HomeScreenProps) => {
+const HomeScreen = ({ locale, habits, logs, isLoading, onToggle, onOpen, onAdd, onReorderHabits }: HomeScreenProps) => {
   const [orderedHabits, setOrderedHabits] = useState(habits);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [shakeMap, setShakeMap] = useState<Record<string, "step" | "complete" | "reset" | null>>({});
@@ -356,27 +373,16 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
     };
   }, []);
 
-  const dropAnimation: DropAnimation = {
-    sideEffects: defaultDropAnimationSideEffects({
-      styles: {
-        active: {
-          opacity: "0",
-        },
-      },
-    }),
-  };
-
   const activeHabit = activeId ? orderedHabits.find((h) => h.id === activeId) : null;
-  const activeHabitLogs = activeId ? logsByHabit.get(activeId) ?? EMPTY_LOGS : EMPTY_LOGS;
 
-  const today = getTodayISO();
-  const activeLog = activeHabit ? activeHabitLogs.find((entry) => entry.date === today) : null;
-  const activeTarget = activeHabit ? Math.max(1, activeHabit.dailyTarget ?? 1) : 1;
-  const activeCount = activeHabit ? Math.min(activeTarget, activeLog?.count ?? 0) : 0;
-  const activeProgress = activeTarget ? activeCount / activeTarget : 0;
-  const activeDone = activeProgress >= 1;
-  const activeStreakWeeks = activeHabit ? getDisciplineStreakWeeks(activeHabitLogs, activeHabit.id, today) : 0;
-  const activeStreakFlames = getFlameCount(activeStreakWeeks);
+  // Show loader while loading from storage
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-foreground/50" />
+      </div>
+    );
+  }
 
   if (habits.length === 0) {
     return (
@@ -400,9 +406,14 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      measuring={{
+        droppable: {
+          strategy: MeasuringStrategy.Always,
+        },
+      }}
     >
       <SortableContext items={orderedHabits.map(h => h.id)} strategy={verticalListSortingStrategy}>
-        <div className="grid gap-4">
+        <div className="grid gap-4 relative" id="habits-container">
           {orderedHabits.map((habit) => {
             const habitLogs = logsByHabit.get(habit.id) ?? EMPTY_LOGS;
             const shake = shakeMap[habit.id];
@@ -423,84 +434,6 @@ const HomeScreen = ({ locale, habits, logs, onToggle, onOpen, onAdd, onReorderHa
           })}
         </div>
       </SortableContext>
-
-      <DragOverlay dropAnimation={dropAnimation}>
-        {activeHabit ? (
-          <Card
-            style={{
-              boxShadow: "0 25px 50px rgba(0,0,0,0.4)",
-              transform: "scale(1.03)",
-              transformOrigin: "center center",
-            }}
-          >
-            <CardContent>
-              <div className="flex items-start gap-3">
-                <div className="flex min-w-0 flex-1 items-start gap-3">
-                  <span
-                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5"
-                    style={{ color: activeHabit.colorToken }}
-                  >
-                    {(() => {
-                      const IconComponent = activeHabit.category ? getCategoryMeta(activeHabit.category).icon : Tag;
-                      return <IconComponent size={26} />;
-                    })()}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-base font-semibold">{activeHabit.name}</h3>
-                    {activeHabit.description && (
-                      <p className="mt-0.5 text-sm text-muted-foreground line-clamp-1">{activeHabit.description}</p>
-                    )}
-                    {(activeStreakFlames > 0 || activeHabit.isPriority) && (
-                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                        {activeStreakFlames > 0 && (
-                          <div className="flex items-center gap-0.5">
-                            {Array.from({ length: activeStreakFlames }).map((_, index) => (
-                              <Flame key={`drag-flame-${activeHabit.id}-${index}`} size={12} style={{ color: activeHabit.colorToken }} />
-                            ))}
-                          </div>
-                        )}
-                        {activeHabit.isPriority && (
-                          <Badge variant="secondary" className="gap-1 h-5 text-[10px]">
-                            <Star size={10} /> {t("priority", locale)}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <button
-                  className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
-                  type="button"
-                >
-                  <span
-                    className="absolute inset-0 rounded-full"
-                    style={{
-                      background: `conic-gradient(${activeHabit.colorToken} ${activeProgress}turn, hsl(var(--muted)) 0)`,
-                      mask: "radial-gradient(circle at center, transparent 58%, black 60%)",
-                      boxShadow: "inset 0 0 0 1px hsl(var(--border))",
-                    }}
-                  />
-                  <span
-                    className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-transform ${
-                      activeDone ? "text-white" : ""
-                    }`}
-                    style={{
-                      background: activeDone ? activeHabit.colorToken : "hsl(var(--muted))",
-                      color: activeDone ? "#fff" : activeHabit.colorToken,
-                      transform: activeDone ? "scale(1.02)" : "scale(1)",
-                    }}
-                  >
-                    {activeTarget > 1 && !activeDone ? <Plus size={14} /> : <Check size={14} />}
-                  </span>
-                </button>
-              </div>
-              <div className="mt-2">
-                <Heatmap logs={activeHabitLogs} accent={activeHabit.colorToken} dailyTarget={activeTarget} />
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
-      </DragOverlay>
     </DndContext>
   );
 };

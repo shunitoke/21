@@ -1,6 +1,8 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Home as HomeIcon, LineChart, Plus, Settings, Sparkles } from "lucide-react";
 import HomeScreen from "@/components/screens/HomeScreen";
 import ProgressScreen from "@/components/screens/ProgressScreen";
@@ -12,12 +14,11 @@ import { t } from "@/lib/i18n";
 import { useAppStore } from "@/store/useAppStore";
 import { getCategoryColor } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { getThemePreference } from "@/services/storage";
 import { InteractiveTutorial } from "@/components/InteractiveTutorial";
-import { Spotlight, useSpotlightTour } from "@/components/Spotlight";
+import { Spotlight } from "@/components/Spotlight";
 import { vibrationFeedback } from "@/utils/vibrationUtils";
 import { useSafeArea } from "@/hooks/useSafeArea";
 import { useBackButton } from "@/hooks/useBackButton";
@@ -32,26 +33,17 @@ export default function Home() {
   const [showSpotlight, setShowSpotlight] = useState(false);
   const [spotlightStep, setSpotlightStep] = useState(0);
   const [hasDialogOverlay, setHasDialogOverlay] = useState(false);
+  const [transitionDir, setTransitionDir] = useState(0);
   const [radioSrc, setRadioSrc] = useState<string | null>(null);
   const [radioPlaying, setRadioPlaying] = useState(false);
   const [radioBuffering, setRadioBuffering] = useState(false);
   const [exitToast, setExitToast] = useState("");
-  const [isReady, setIsReady] = useState(false);
   const radioAudioRef = useRef<HTMLAudioElement | null>(null);
   const pendingScrollResetRef = useRef(false);
   const didSwipeRef = useRef(false);
   const dragStartXRef = useRef<number | null>(null);
-  const [frozenSnapshot, setFrozenSnapshot] = useState<{
-    screen: ReturnType<typeof useAppStore.getState>["screen"];
-    sortedHabits: Habit[];
-    logs: ReturnType<typeof useAppStore.getState>["logs"];
-    journal: ReturnType<typeof useAppStore.getState>["journal"];
-    stopCrane: ReturnType<typeof useAppStore.getState>["stopCrane"];
-    achievements: ReturnType<typeof useAppStore.getState>["achievements"];
-    settings: ReturnType<typeof useAppStore.getState>["settings"];
-    loading: ReturnType<typeof useAppStore.getState>["loading"];
-  } | null>(null);
   const safeArea = useSafeArea();
+
   const {
     screen,
     setScreen,
@@ -86,15 +78,6 @@ export default function Home() {
   useEffect(() => {
     void init();
   }, [init]);
-
-  // Smooth fade-in when data is loaded to avoid partial rendering flicker
-  useEffect(() => {
-    if (!loading && !isReady) {
-      // Small delay to ensure all components are mounted
-      const timer = setTimeout(() => setIsReady(true), 50);
-      return () => clearTimeout(timer);
-    }
-  }, [loading, isReady]);
 
   // Request notification permissions and schedule on init
   useEffect(() => {
@@ -142,18 +125,6 @@ export default function Home() {
 
   useEffect(() => {
     pendingScrollResetRef.current = true;
-  }, [screen]);
-
-  // Scroll reset after screen transition completes
-  useEffect(() => {
-    if (!pendingScrollResetRef.current) return;
-    const timer = setTimeout(() => {
-      pendingScrollResetRef.current = false;
-      const root = document.querySelector<HTMLDivElement>(".app-root");
-      if (root) root.scrollTo({ top: 0, left: 0, behavior: "auto" });
-      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-    }, 250); // Match transition duration
-    return () => clearTimeout(timer);
   }, [screen]);
 
   useEffect(() => {
@@ -286,6 +257,8 @@ export default function Home() {
       if (currentIndex === -1) return;
       const clamped = Math.max(0, Math.min(mainScreens.length - 1, nextIndex));
       if (clamped === currentIndex) return;
+      const dir = Math.sign(clamped - currentIndex);
+      flushSync(() => setTransitionDir(dir));
       setScreen(mainScreens[clamped]);
     },
     [mainScreenIndex, mainScreens, screen, setScreen]
@@ -293,9 +266,17 @@ export default function Home() {
 
   const setScreenWithDirection = useCallback(
     (next: ReturnType<typeof useAppStore.getState>["screen"]) => {
+      const from = mainScreenIndex(screen);
+      const to = mainScreenIndex(next);
+      if (from !== -1 && to !== -1) {
+        const dir = Math.sign(to - from);
+        flushSync(() => setTransitionDir(dir));
+      } else {
+        flushSync(() => setTransitionDir(0));
+      }
       setScreen(next);
     },
-    [setScreen]
+    [mainScreenIndex, screen, setScreen]
   );
 
   useEffect(() => {
@@ -311,38 +292,6 @@ export default function Home() {
     observer.observe(document.body, { childList: true, subtree: true, attributes: true });
     return () => observer.disconnect();
   }, []);
-
-  useEffect(() => {
-    if (!hasDialogOverlay) {
-      setFrozenSnapshot(null);
-      return;
-    }
-
-    setFrozenSnapshot((prev) => {
-      if (prev) return prev;
-      return {
-        screen,
-        sortedHabits,
-        logs,
-        journal,
-        stopCrane,
-        achievements,
-        settings,
-        loading,
-      };
-    });
-  }, [achievements, hasDialogOverlay, journal, loading, logs, screen, settings, sortedHabits, stopCrane]);
-
-  const background = frozenSnapshot ?? {
-    screen,
-    sortedHabits,
-    logs,
-    journal,
-    stopCrane,
-    achievements,
-    settings,
-    loading,
-  };
 
   const handleToggle = (habitId: string, isPriority: boolean, dailyTarget = 1) => {
     toggleHabitToday(habitId, isPriority, dailyTarget);
@@ -473,6 +422,24 @@ export default function Home() {
     onShowToast: setExitToast,
   });
 
+  // Faster screen transition variants for native-like feel
+  const screenVariants = useMemo(
+    () => ({
+      enter: (direction: number) => ({
+        x: direction === 0 ? "0%" : direction > 0 ? "100%" : "-100%",
+        opacity: 1,
+        position: "relative" as const,
+      }),
+      center: { x: "0%", opacity: 1, position: "relative" as const },
+      exit: (direction: number) => ({
+        x: direction === 0 ? "0%" : direction > 0 ? "-100%" : "100%",
+        opacity: 1,
+        position: "absolute" as const,
+      }),
+    }),
+    []
+  );
+
   const handleSwipe = useCallback(
     (delta: number) => {
       if (hasDialogOverlay) return;
@@ -483,9 +450,12 @@ export default function Home() {
     [goToMainIndex, hasDialogOverlay, mainScreenIndex, screen]
   );
 
+  // Remove loading spinner - render immediately with default data
+  // Data hydrates in background via init()
+
   return (
     <div
-      className={`app-root flex min-h-[100svh] flex-col w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-[max(24px,env(safe-area-inset-top))] text-foreground transition-opacity duration-150 ${isReady ? 'opacity-100' : 'opacity-0'}`}
+      className="app-root flex min-h-[100svh] flex-col w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-[max(24px,env(safe-area-inset-top))] text-foreground"
       style={{ maxWidth: '100vw', overflowX: 'hidden', touchAction: 'pan-y' }}
       onClickCapture={(event) => {
         if (!didSwipeRef.current) return;
@@ -558,7 +528,7 @@ export default function Home() {
         className="flex flex-1 flex-col"
         style={{ position: "relative", overflow: "hidden", width: "100%" }}
         onPointerDown={(e) => {
-          if (background.screen !== "home" && background.screen !== "progress" && background.screen !== "practice") return;
+          if (screen !== "home" && screen !== "progress" && screen !== "practice") return;
           dragStartXRef.current = e.clientX;
           didSwipeRef.current = false;
         }}
@@ -582,23 +552,37 @@ export default function Home() {
           dragStartXRef.current = null;
         }}
       >
-        {/* CSS-based screen transitions - all screens always rendered for instant switching */}
-        <div
-          className="screens-container"
-          style={{
-            display: 'flex',
-            width: '300%',
-            height: '100%',
-            transform: `translateX(${mainScreenIndex(background.screen) * -33.333}%)`,
-            transition: 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)',
-            willChange: 'transform',
+        <AnimatePresence
+          initial={true}
+          custom={transitionDir}
+          onExitComplete={() => {
+            if (!pendingScrollResetRef.current) return;
+            pendingScrollResetRef.current = false;
+            const root = document.querySelector<HTMLDivElement>(".app-root");
+            if (root) root.scrollTo({ top: 0, left: 0, behavior: "auto" });
+            window.scrollTo({ top: 0, left: 0, behavior: "auto" });
           }}
         >
-          <div className="screen-panel w-full h-full flex-shrink-0" style={{ width: '33.333%' }}>
+        <motion.div
+          key={screen}
+          custom={transitionDir}
+          variants={screenVariants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          className="w-full flex-1 will-change-transform"
+          transition={{ duration: 0.1, ease: [0.22, 1, 0.36, 1] }}
+          drag={screen === "home" || screen === "progress" || screen === "practice" ? "x" : false}
+          dragListener={false}
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.12}
+          style={{ touchAction: "pan-y" }}
+        >
+          {screen === "home" && (
             <HomeScreen
               locale={locale}
-              habits={background.sortedHabits}
-              logs={background.logs}
+              habits={sortedHabits}
+              logs={logs}
               onToggle={handleToggle}
               onOpen={(habit) => {
                 setSelectedHabit(habit);
@@ -610,22 +594,22 @@ export default function Home() {
               }}
               onReorderHabits={handleReorderHabits}
             />
-          </div>
-          <div className="screen-panel w-full h-full flex-shrink-0" style={{ width: '33.333%' }}>
+          )}
+          {screen === "progress" && (
             <ProgressScreen
               locale={locale}
-              habits={background.sortedHabits}
-              logs={background.logs}
-              achievements={background.achievements}
-              journal={background.journal}
-              isActive={background.screen === "progress"}
+              habits={sortedHabits}
+              logs={logs}
+              achievements={achievements}
+              journal={journal}
+              isActive={screen === "progress"}
             />
-          </div>
-          <div className="screen-panel w-full h-full flex-shrink-0" style={{ width: '33.333%' }}>
+          )}
+          {screen === "practice" && (
             <PracticeScreen
               locale={locale}
-              journal={background.journal}
-              stopCrane={background.stopCrane}
+              journal={journal}
+              stopCrane={stopCrane}
               onAddJournal={handleAddJournal}
               onRemoveJournal={removeJournalEntry}
               onAddStopCrane={handleAddStopCrane}
@@ -636,8 +620,9 @@ export default function Home() {
               radioBuffering={radioBuffering}
               onToggleRadio={handleToggleRadio}
             />
-          </div>
-        </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
       </div>
       <audio ref={radioAudioRef} preload="none" />
       <nav className="fixed inset-x-0 bottom-4 z-40 flex justify-center">
@@ -645,7 +630,7 @@ export default function Home() {
           <Button
             type="button"
             size="icon-lg"
-            variant={background.screen === "home" ? "default" : "ghost"}
+            variant={screen === "home" ? "default" : "ghost"}
             aria-label={t("homeTitle", locale)}
             onClick={() => {
               vibrationFeedback.tabSwitch();
@@ -658,7 +643,7 @@ export default function Home() {
           <Button
             type="button"
             size="icon-lg"
-            variant={background.screen === "progress" ? "default" : "ghost"}
+            variant={screen === "progress" ? "default" : "ghost"}
             aria-label={t("progressTitle", locale)}
             onClick={() => {
               vibrationFeedback.tabSwitch();
@@ -671,7 +656,7 @@ export default function Home() {
           <Button
             type="button"
             size="icon-lg"
-            variant={background.screen === "practice" ? "default" : "ghost"}
+            variant={screen === "practice" ? "default" : "ghost"}
             aria-label={t("practiceTitle", locale)}
             onClick={() => {
               vibrationFeedback.tabSwitch();
