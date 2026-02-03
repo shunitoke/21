@@ -1,15 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { createPortal } from "react-dom";
 import type { Locale } from "@/lib/types";
 import { t } from "@/lib/i18n";
 
@@ -25,6 +17,8 @@ export function ImagePreviewDialog({ src, locale, onClose }: ImagePreviewDialogP
   const pinchRef = useRef<{ distance: number; scale: number } | null>(null);
   const panRef = useRef<{ x: number; y: number } | null>(null);
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const lastTapRef = useRef(0);
 
   useEffect(() => {
     if (src) return;
@@ -47,11 +41,31 @@ export function ImagePreviewDialog({ src, locale, onClose }: ImagePreviewDialogP
     };
   };
 
+  const resetTransform = () => setTransform({ scale: 1, x: 0, y: 0 });
+
+  const handleTap = () => {
+    const now = Date.now();
+    const doubleTapThreshold = 300;
+    if (now - lastTapRef.current < doubleTapThreshold) {
+      // Double tap - toggle zoom
+      setTransform((prev) => (prev.scale > 1 ? { scale: 1, x: 0, y: 0 } : { scale: 2, x: 0, y: 0 }));
+    } else {
+      // Single tap - close if zoomed out
+      if (transform.scale <= 1.1) {
+        onClose();
+      } else {
+        resetTransform();
+      }
+    }
+    lastTapRef.current = now;
+  };
+
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
     (event.currentTarget as HTMLDivElement).setPointerCapture(event.pointerId);
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    touchStartRef.current = { x: event.clientX, y: event.clientY, time: Date.now() };
     if (pointersRef.current.size === 2) {
       const points = Array.from(pointersRef.current.values());
       const dx = points[0].x - points[1].x;
@@ -84,56 +98,59 @@ export function ImagePreviewDialog({ src, locale, onClose }: ImagePreviewDialogP
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = touchStartRef.current;
     pointersRef.current.delete(event.pointerId);
     if (pointersRef.current.size < 2) pinchRef.current = null;
-    if (pointersRef.current.size === 0) panRef.current = null;
+    if (pointersRef.current.size === 0) {
+      panRef.current = null;
+      // Check for swipe down to close or tap
+      if (start) {
+        const dx = event.clientX - start.x;
+        const dy = event.clientY - start.y;
+        const duration = Date.now() - start.time;
+        const velocity = dy / duration;
+        // Swipe down with enough velocity and distance
+        if (dy > 80 && velocity > 0.3 && Math.abs(dx) < 100) {
+          onClose();
+          return;
+        }
+        // Small movement = tap
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && duration < 300) {
+          handleTap();
+        }
+      }
+      touchStartRef.current = null;
+    }
   };
 
-  return (
-    <Dialog open={Boolean(src)} onOpenChange={(value) => !value && onClose()}>
-      <DialogContent
-        className="h-[100svh] w-screen max-w-none gap-0 overflow-hidden rounded-none border-none bg-background/95 p-0 text-foreground"
-        showCloseButton={false}
+  if (!src) return null;
+
+  return createPortal(
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xl animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        ref={viewportRef}
+        className="relative animate-in zoom-in-95 duration-200"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onClick={(e) => e.stopPropagation()}
       >
-        <DialogHeader className="sr-only">
-          <DialogTitle>{t("image", locale)}</DialogTitle>
-          <DialogDescription>{t("dialogDetails", locale)}</DialogDescription>
-        </DialogHeader>
-        <div
-          ref={viewportRef}
-          className="relative flex h-full w-full items-center justify-center overflow-hidden"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-        >
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_hsl(var(--foreground)/0.12),_transparent_60%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_hsl(var(--foreground)/0.08),_transparent_65%)]" />
-            <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-background/70 via-transparent to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
-          </div>
-          {src && (
-            <img
-              src={src}
-              alt=""
-              className="max-h-full max-w-full select-none drop-shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
-              style={{ transform: `translate3d(${transform.x}px, ${transform.y}px, 0) scale(${transform.scale})` }}
-              draggable={false}
-            />
-          )}
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            className="absolute right-4 top-4 border-border/60 bg-background/80 text-foreground hover:bg-muted"
-            onClick={onClose}
-            aria-label={t("close", locale)}
-          >
-            <X size={16} />
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        <img
+          src={src}
+          alt=""
+          className="select-none max-h-[85svh] max-w-[85vw] object-contain"
+          style={{ 
+            transform: `translate3d(${transform.x}px, ${transform.y}px, 0) scale(${transform.scale})`, 
+            transition: panRef.current ? 'none' : 'transform 0.2s ease'
+          }}
+          draggable={false}
+        />
+      </div>
+    </div>,
+    document.body
   );
 }

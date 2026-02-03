@@ -408,18 +408,23 @@ body:has([data-slot="dialog-overlay"]) {
   --modal-blur-active: 1;
 }
 
-body:has([data-slot="dialog-overlay"]) .app-root {
+body:has([data-slot="dialog-overlay"]) .app-root,
+body:has([data-slot="alert-dialog-overlay"]) .app-root {
   filter: blur(14px) saturate(1.2);
   transition: filter var(--transition-normal) ease;
+  transform: translateZ(0);
+  will-change: filter;
 }
 
 @supports ((backdrop-filter: blur(0)) or (-webkit-backdrop-filter: blur(0))) {
-  [data-slot="dialog-overlay"] {
+  [data-slot="dialog-overlay"],
+  [data-slot="alert-dialog-overlay"] {
     background: var(--modal-overlay);
   }
 }
 
-[data-slot="dialog-overlay"] {
+[data-slot="dialog-overlay"],
+[data-slot="alert-dialog-overlay"] {
   background: var(--modal-overlay-strong);
   backdrop-filter: blur(32px) saturate(1.4);
   -webkit-backdrop-filter: blur(32px) saturate(1.4);

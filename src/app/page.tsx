@@ -471,7 +471,7 @@ export default function Home() {
 
   return (
     <div
-      className="app-root flex min-h-[100svh] flex-col w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-3 text-foreground"
+      className="app-root flex min-h-[100svh] flex-col w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-4 text-foreground"
       style={{ maxWidth: '100vw', overflowX: 'hidden', touchAction: 'pan-y' }}
       onClickCapture={(event) => {
         if (!didSwipeRef.current) return;
