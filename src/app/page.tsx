@@ -141,15 +141,26 @@ export default function Home() {
 
   useLayoutEffect(() => {
     const root = document.documentElement;
+    const body = document.body;
     const applyTheme = (mode: ThemePreference) => {
+      let resolvedMode: "light" | "dark";
       if (mode === "system") {
         const isDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-        root.dataset.theme = isDark ? "dark" : "light";
-        root.dataset.appearance = isDark ? "dark" : "light";
-        return;
+        resolvedMode = isDark ? "dark" : "light";
+      } else {
+        resolvedMode = mode;
       }
-      root.dataset.theme = mode;
-      root.dataset.appearance = mode;
+      root.dataset.theme = resolvedMode;
+      root.dataset.appearance = resolvedMode;
+      // Update background color immediately
+      const bgColor = resolvedMode === "dark" ? "#0a0b0f" : "#fff";
+      const colorScheme = resolvedMode;
+      root.style.backgroundColor = bgColor;
+      root.style.colorScheme = colorScheme;
+      if (body) {
+        body.style.backgroundColor = bgColor;
+        body.style.colorScheme = colorScheme;
+      }
     };
 
     // Get theme from IndexedDB
@@ -583,6 +594,7 @@ export default function Home() {
               locale={locale}
               habits={sortedHabits}
               logs={logs}
+              isLoading={loading}
               onToggle={handleToggle}
               onOpen={(habit) => {
                 setSelectedHabit(habit);
@@ -625,7 +637,7 @@ export default function Home() {
       </AnimatePresence>
       </div>
       <audio ref={radioAudioRef} preload="none" />
-      <nav className="fixed inset-x-0 bottom-4 z-40 flex justify-center">
+      <nav className="fixed inset-x-0 bottom-4 z-40 flex justify-center translate-z-0">
         <div className="flex items-center gap-3 rounded-full border border-border/60 bg-background/80 px-4 py-3 shadow-lg backdrop-blur-md">
           <Button
             type="button"

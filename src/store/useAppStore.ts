@@ -609,11 +609,11 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
   updateSettings: (settings: Partial<UserSettings>) => {
     const previousDemoMode = get().settings.demoMode;
     const nextSettings = { ...get().settings, ...settings };
+    set({ settings: nextSettings });
     if (settings.demoMode !== undefined && settings.demoMode !== previousDemoMode) {
       get().toggleDemoMode(Boolean(settings.demoMode));
       return;
     }
-    set({ settings: nextSettings });
     persistThemePreference(nextSettings.theme);
     void persistState(
       {

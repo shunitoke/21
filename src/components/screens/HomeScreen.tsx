@@ -14,6 +14,7 @@ import {
   type DragStartEvent,
   MeasuringStrategy,
   DragOverlay,
+  type Modifier,
 } from "@dnd-kit/core";
 import { createPortal } from "react-dom";
 import {
@@ -134,6 +135,7 @@ const SortableHabitCard = memo(function SortableHabitCard({
       zIndex: isSortableDragging ? 9999 : 1,
       position: 'relative' as const,
       opacity: 1,
+      willChange: isSortableDragging ? 'transform' : 'auto',
     };
   }, [isSortableDragging, transform, transition]);
 
@@ -156,7 +158,7 @@ const SortableHabitCard = memo(function SortableHabitCard({
       {...listeners}
     >
       <Card
-        className="transition-shadow duration-200 cursor-grab active:cursor-grabbing"
+        className="transition-shadow duration-200 cursor-grab active:cursor-grabbing translate-z-0"
         style={{
           boxShadow: isSortableDragging 
             ? "0 25px 50px rgba(0,0,0,0.35)" 
