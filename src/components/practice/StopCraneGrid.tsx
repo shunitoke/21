@@ -301,7 +301,7 @@ export function StopCraneGrid({
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <SortableContext items={orderedItems.map((item) => item.id)} strategy={rectSortingStrategy}>
-        <div ref={gridRef} className="relative grid grid-cols-2 gap-3 pb-2" style={{ contain: "layout paint style" }}>
+        <div ref={gridRef} className="relative grid grid-cols-2 gap-3 pb-6">
           {orderedItems.map((item, index) => (
             <SortableItem
               key={item.id}

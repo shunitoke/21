@@ -54,17 +54,24 @@ const RadioAnchor = ({ src, locale }: RadioAnchorProps) => {
       wasPlayingRef.current = true;
     };
 
+    const handleCanPlay = () => {
+      setIsBuffering(false);
+    };
+
     audio.addEventListener("error", handleError);
     audio.addEventListener("waiting", handleWaiting);
     audio.addEventListener("playing", handlePlaying);
+    audio.addEventListener("canplay", handleCanPlay);
 
     audio.src = src;
+    audio.preload = "metadata";
     audio.load();
 
     return () => {
       audio.removeEventListener("error", handleError);
       audio.removeEventListener("waiting", handleWaiting);
       audio.removeEventListener("playing", handlePlaying);
+      audio.removeEventListener("canplay", handleCanPlay);
       if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
     };
   }, [src, locale]);
@@ -116,7 +123,7 @@ const RadioAnchor = ({ src, locale }: RadioAnchorProps) => {
             </span>
           </div>
         </div>
-        <audio ref={audioRef} preload="none" />
+        <audio ref={audioRef} />
       </CardContent>
     </Card>
   );
