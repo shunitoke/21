@@ -266,33 +266,33 @@ export const demoJournal: JournalEntry[] = demoJournalDays.map((date, index) => 
 
 export const demoStopCrane: StopCraneItem[] = [
   {
-    id: "demo-stop-1",
+    id: "anchor-1",
     type: "text",
     content: "Пауза: 5 вдохов и выдохов, замедлись.",
     createdAt: new Date().toISOString(),
   },
   {
-    id: "demo-stop-2",
+    id: "anchor-2",
     type: "link",
     content: "https://www.youtube.com/watch?v=uwEaQk5VeS4",
     createdAt: new Date().toISOString(),
   },
   {
-    id: "demo-stop-3",
+    id: "anchor-3",
+    type: "stop",
+    content: "STOP",
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "anchor-4",
     type: "image",
     content: "/demo.png",
     createdAt: new Date().toISOString(),
   },
   {
-    id: "demo-stop-4",
+    id: "anchor-5",
     type: "radio",
     content: "https://radio.plaza.one/ogg",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "demo-stop-5",
-    type: "stop",
-    content: "STOP",
     createdAt: new Date().toISOString(),
   },
 ];

@@ -422,54 +422,27 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
     }
 
     if (persisted.settings.demoMode) {
-      const demoData = await loadState(DEMO_STATE_KEY);
-      // Preserve tutorialCompleted from main state
+      // Always use fresh demo data from demo.ts, not from IndexedDB
       const tutorialCompleted = persisted.settings.tutorialCompleted;
-      if (demoData) {
-        const migratedHabits = demoData.habits.map((habit) => ({
-          ...habit,
-          colorToken: getCategoryColor(habit.category),
-        }));
-        set({
-          settings: { ...demoData.settings, tutorialCompleted },
-          habits: migratedHabits,
-          logs: demoData.logs,
-          journal: demoData.journal,
-          stopCrane: demoData.stopCrane,
-          achievements: computeAchievements(migratedHabits, demoData.logs, demoData.journal),
-          loading: false,
-        });
-        await persistState(
-          {
-            settings: { ...demoData.settings, tutorialCompleted },
-            habits: migratedHabits,
-            logs: demoData.logs,
-            journal: demoData.journal,
-            stopCrane: demoData.stopCrane,
-          },
-          true
-        );
-        return;
-      }
+      set({
+        settings: { ...demoSettings, tutorialCompleted, demoMode: true },
+        habits: [...demoHabits, ...demoArchivedHabits],
+        logs: demoLogs,
+        journal: demoJournal,
+        stopCrane: demoStopCrane,
+        achievements: computeAchievements([...demoHabits, ...demoArchivedHabits], demoLogs, demoJournal),
+        loading: false,
+      });
       await persistState(
         {
-          settings: { ...demoSettings, tutorialCompleted },
-          habits: demoHabits,
+          settings: { ...demoSettings, tutorialCompleted, demoMode: true },
+          habits: [...demoHabits, ...demoArchivedHabits],
           logs: demoLogs,
           journal: demoJournal,
           stopCrane: demoStopCrane,
         },
         true
       );
-      set({
-        settings: { ...demoSettings, tutorialCompleted },
-        habits: demoHabits,
-        logs: demoLogs,
-        journal: demoJournal,
-        stopCrane: demoStopCrane,
-        achievements: computeAchievements(demoHabits, demoLogs, demoJournal),
-        loading: false,
-      });
       return;
     }
 
@@ -525,21 +498,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
       persistThemePreference(currentTheme);
       void (async () => {
         await persistState(mainSnapshot, false);
-        const demoData = await loadState(DEMO_STATE_KEY);
-        if (demoData) {
-          set({
-            screen: "home",
-            settings: { ...demoData.settings, theme: currentTheme, locale: currentLocale, demoMode: true, tutorialCompleted },
-            habits: [...demoData.habits, ...demoArchivedHabits],
-            logs: demoData.logs,
-            journal: demoData.journal,
-            stopCrane: demoData.stopCrane,
-            achievements: computeAchievements([...demoData.habits, ...demoArchivedHabits], demoData.logs, demoData.journal),
-            loading: false,
-          });
-          persistThemePreference(currentTheme);
-          return;
-        }
+        // Always use fresh demo data from demo.ts, not from IndexedDB
         await persistState(
           {
             settings: { ...demoSettings, theme: currentTheme, locale: currentLocale, demoMode: true, tutorialCompleted },
