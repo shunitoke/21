@@ -487,9 +487,69 @@ export const dictionary: Dictionary = {
     ru: "Что сейчас чувствуешь?",
     en: "What are you feeling right now?",
   },
-  chooseEmotions: {
+  emotions: {
     ru: "Эмоции",
     en: "Emotions",
+  },
+  спокойствие: {
+    ru: "Спокойствие",
+    en: "Calm",
+  },
+  энергия: {
+    ru: "Энергия",
+    en: "Energy",
+  },
+  благодарность: {
+    ru: "Благодарность",
+    en: "Gratitude",
+  },
+  любовь: {
+    ru: "Любовь",
+    en: "Love",
+  },
+  гордость: {
+    ru: "Гордость",
+    en: "Pride",
+  },
+  уверенность: {
+    ru: "Уверенность",
+    en: "Confidence",
+  },
+  фокус: {
+    ru: "Фокус",
+    en: "Focus",
+  },
+  вдохновение: {
+    ru: "Вдохновение",
+    en: "Inspiration",
+  },
+  тревога: {
+    ru: "Тревога",
+    en: "Anxiety",
+  },
+  грусть: {
+    ru: "Грусть",
+    en: "Sadness",
+  },
+  today: {
+    ru: "Сегодня",
+    en: "Today",
+  },
+  week: {
+    ru: "Неделя",
+    en: "Week",
+  },
+  month: {
+    ru: "Месяц",
+    en: "Month",
+  },
+  year: {
+    ru: "Год",
+    en: "Year",
+  },
+  all: {
+    ru: "Все",
+    en: "All",
   },
   attachAudio: {
     ru: "Прикрепить аудио",

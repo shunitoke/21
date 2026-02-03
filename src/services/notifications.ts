@@ -90,7 +90,6 @@ export async function scheduleNotifications(
   const validEnd = Math.max(validStart + 1, Math.min(23, settings.endHour));
   
   if (validEnd <= validStart) {
-    console.warn("Invalid notification time window, skipping scheduling");
     return;
   }
 
@@ -101,7 +100,6 @@ export async function scheduleNotifications(
   const times = generateRandomTimes(count, validStart, validEnd);
   
   if (times.length === 0) {
-    console.warn("No valid times generated for notifications");
     return;
   }
 
@@ -123,8 +121,8 @@ export async function scheduleNotifications(
     await LocalNotifications.schedule({
       notifications,
     });
-  } catch (error) {
-    console.error("Failed to schedule notifications:", error);
+  } catch {
+    // Silent fail
   }
 }
 
@@ -134,8 +132,8 @@ export async function cancelAllNotifications(): Promise<void> {
     if (pending.notifications.length > 0) {
       await LocalNotifications.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
     }
-  } catch (error) {
-    console.error("Failed to cancel notifications:", error);
+  } catch {
+    // Silent fail
   }
 }
 
@@ -152,7 +150,6 @@ export async function rescheduleForTomorrow(
   const validEnd = Math.max(validStart + 1, Math.min(23, settings.endHour));
   
   if (validEnd <= validStart) {
-    console.warn("Invalid notification time window for reschedule");
     return;
   }
 

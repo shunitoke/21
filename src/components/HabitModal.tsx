@@ -138,7 +138,7 @@ export default function HabitModal({
 
   useEffect(() => {
     if (!open) return;
-    const initKey = `${habit?.id ?? "new"}:${open ? "open" : "closed"}`;
+    const initKey = `${habit?.id ?? "new"}:${open ? "open" : "closed"}:${habit?.streakGoal ?? "null"}:${habit?.name ?? ""}`;
     if (initKeyRef.current === initKey) return;
     initKeyRef.current = initKey;
 

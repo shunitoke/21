@@ -32,11 +32,9 @@ const getSupportedMimeType = (): string => {
   const types = ['audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg', 'audio/wav'];
   for (const type of types) {
     if (MediaRecorder.isTypeSupported(type)) {
-      console.log('[Audio] Supported MIME type:', type);
       return type;
     }
   }
-  console.log('[Audio] No specific MIME type supported, using default');
   return '';
 };
 
@@ -126,7 +124,7 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
           setAudioUrl(dataUrl);
         }
       } catch (e) {
-        console.error('[Audio] Native stop recording error:', e);
+        // Silent fail
       }
       setRecording(false);
       setRecordingDuration(0);
@@ -143,7 +141,7 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
       try {
         activeRecorder.stop();
       } catch (e) {
-        console.error('[Audio] Error stopping recorder:', e);
+        // Silent fail
       }
     }
     activeRecorder?.stream?.getTracks().forEach((track) => track.stop());
@@ -232,14 +230,12 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
 
           // Start recording
           await VoiceRecorder.startRecording();
-          console.log('[Audio] Native recording started');
 
           // Start duration timer
           durationIntervalRef.current = setInterval(() => {
             setRecordingDuration(prev => prev + 1);
           }, 1000);
         } catch (e) {
-          console.error('[Audio] Native recording failed:', e);
           setRecordingError('Recording failed: ' + (e as Error).message);
           setRecording(false);
         }
@@ -268,9 +264,7 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
           mediaRecorder = mimeType
             ? new MediaRecorder(stream, { mimeType })
             : new MediaRecorder(stream);
-          console.log('[Audio] MediaRecorder created, mimeType:', mediaRecorder.mimeType || 'default');
         } catch (e) {
-          console.error('[Audio] Failed to create MediaRecorder:', e);
           setRecordingError('Failed to create recorder: ' + (e as Error).message);
           setRecording(false);
           return;
@@ -288,7 +282,7 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
           setAudioContext(audioCtx);
           setAnalyser(anal);
         } catch (e) {
-          console.error('[Audio] Failed to create audio context:', e);
+          // Silent fail for audio context
         }
 
         const chunks: Blob[] = [];
@@ -301,7 +295,6 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
 
         mediaRecorder.onstop = () => {
           if (chunks.length === 0) {
-            console.error('[Audio] No data recorded');
             setRecordingError('No audio data recorded');
             return;
           }
@@ -313,25 +306,21 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
               setAudioUrl(reader.result);
             }
           };
-          reader.onerror = (e) => {
-            console.error('[Audio] FileReader error:', e);
+          reader.onerror = () => {
             setRecordingError('Failed to process audio');
           };
           reader.readAsDataURL(blob);
         };
 
-        mediaRecorder.onerror = (e) => {
-          console.error('[Audio] MediaRecorder error:', e);
-          setRecordingError('Recording error: ' + (e as ErrorEvent).message);
+        mediaRecorder.onerror = () => {
+          setRecordingError('Recording error');
           setRecording(false);
         };
 
         try {
-          mediaRecorder.start(100); // Request data every 100ms for better compatibility
-          console.log('[Audio] MediaRecorder started, state:', mediaRecorder.state);
+          mediaRecorder.start(100);
           setRecorder(mediaRecorder);
         } catch (e) {
-          console.error('[Audio] Failed to start MediaRecorder:', e);
           setRecordingError('Failed to start: ' + (e as Error).message);
           setRecording(false);
           return;
@@ -343,7 +332,6 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
         }, 1000);
       })
       .catch((err) => {
-        console.error('[Audio] Recording failed:', err);
         setRecordingError('Microphone access failed: ' + err.message);
         setRecording(false);
       });

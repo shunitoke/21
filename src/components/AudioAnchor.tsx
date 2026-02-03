@@ -18,6 +18,9 @@ const AudioAnchor = ({ src, locale }: AudioAnchorProps) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const wasPlayingRef = useRef(false);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -29,23 +32,55 @@ const AudioAnchor = ({ src, locale }: AudioAnchorProps) => {
       setIsPlaying(false);
       setCurrentTime(0);
     };
+    const handleError = () => {
+      setError(t("buffering", locale));
+      setIsPlaying(false);
+      // Auto-retry after 3 seconds if it was playing
+      if (wasPlayingRef.current) {
+        if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = setTimeout(() => {
+          audio.load();
+          audio.play().then(() => {
+            setIsPlaying(true);
+            setError(null);
+          }).catch(() => {
+            setError(t("stopped", locale));
+          });
+        }, 3000);
+      }
+    };
+    const handleWaiting = () => {
+      setError(t("buffering", locale));
+    };
+    const handlePlaying = () => {
+      setError(null);
+      wasPlayingRef.current = true;
+    };
 
     audio.addEventListener("timeupdate", updateTime);
     audio.addEventListener("loadedmetadata", updateDuration);
     audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError);
+    audio.addEventListener("waiting", handleWaiting);
+    audio.addEventListener("playing", handlePlaying);
 
     return () => {
       audio.removeEventListener("timeupdate", updateTime);
       audio.removeEventListener("loadedmetadata", updateDuration);
       audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError);
+      audio.removeEventListener("waiting", handleWaiting);
+      audio.removeEventListener("playing", handlePlaying);
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
     };
-  }, []);
+  }, [locale]);
 
   const togglePlay = () => {
     const audio = audioRef.current;
     if (!audio || !src) return;
 
-    if (!isLoaded) {
+    // Always reload if src changed
+    if (!isLoaded || audio.src !== src) {
       audio.src = src;
       audio.load();
       setIsLoaded(true);
@@ -54,16 +89,24 @@ const AudioAnchor = ({ src, locale }: AudioAnchorProps) => {
     if (isPlaying) {
       audio.pause();
       setIsPlaying(false);
+      wasPlayingRef.current = false;
     } else {
       audio
         .play()
-        .then(() => setIsPlaying(true))
-        .catch(() => setIsPlaying(false));
+        .then(() => {
+          setIsPlaying(true);
+          wasPlayingRef.current = true;
+          setError(null);
+        })
+        .catch(() => {
+          setIsPlaying(false);
+          setError(t("stopped", locale));
+        });
     }
   };
 
   const formatTime = (time: number) => {
-    if (!Number.isFinite(time)) return "0:00";
+    if (!Number.isFinite(time) || time < 0) return "0:00";
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
@@ -72,7 +115,7 @@ const AudioAnchor = ({ src, locale }: AudioAnchorProps) => {
   return (
     <Card>
       <CardContent className="grid gap-2">
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
           <Button
             variant="outline"
             size="icon-sm"
@@ -81,29 +124,30 @@ const AudioAnchor = ({ src, locale }: AudioAnchorProps) => {
           >
             {isPlaying ? <Pause size={14} /> : <Play size={14} />}
           </Button>
-          <div className="grid gap-1">
-            <span className="text-xs font-semibold">{t("audio", locale)}</span>
-            <span className="text-sm text-muted-foreground">
-              {formatTime(currentTime)} / {formatTime(duration)}
+          <div className="grid gap-1 min-w-0">
+            <span className="text-xs font-semibold truncate">{t("audio", locale)}</span>
+            <span className="text-sm text-muted-foreground truncate">
+              {error || `${formatTime(currentTime)} / ${formatTime(duration)}`}
             </span>
           </div>
-          <input
-            type="range"
-            min={0}
-            max={duration || 0}
-            step={0.1}
-            value={Math.min(currentTime, duration || 0)}
-            className="w-28"
-            style={{ accentColor: "var(--color-ring)" }}
-            onChange={(event) => {
-              const value = Number(event.target.value);
-              if (!audioRef.current) return;
-              audioRef.current.currentTime = value;
-              setCurrentTime(value);
-            }}
-          />
         </div>
-        <audio ref={audioRef} preload="none" />
+        <input
+          type="range"
+          min={0}
+          max={duration > 0 ? duration : 1}
+          step={0.1}
+          value={Math.min(currentTime, duration > 0 ? duration : 0)}
+          disabled={duration <= 0}
+          className="w-full"
+          style={{ accentColor: "var(--color-ring)" }}
+          onChange={(event) => {
+            const value = Number(event.target.value);
+            if (!audioRef.current) return;
+            audioRef.current.currentTime = value;
+            setCurrentTime(value);
+          }}
+        />
+        <audio ref={audioRef} preload="metadata" />
       </CardContent>
     </Card>
   );

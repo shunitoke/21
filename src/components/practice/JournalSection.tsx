@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { JournalToolbar } from "./JournalToolbar";
 import { JournalTimeline } from "@/components/JournalEntryCard";
 import { t } from "@/lib/i18n";
@@ -51,6 +52,7 @@ export function JournalSection({ journal, locale, onAddEntry, onDeleteEntry }: J
   const [dateFilterType, setDateFilterType] = useState<"all" | "today" | "week" | "month" | "year">("all");
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(8);
+  const [showFilters, setShowFilters] = useState(false);
 
   const pageSize = 8;
 
@@ -79,6 +81,14 @@ export function JournalSection({ journal, locale, onAddEntry, onDeleteEntry }: J
     setVisibleCount(pageSize);
   }, []);
 
+  const handleOpenFilters = useCallback(() => {
+    setShowFilters(true);
+  }, []);
+
+  const handleCloseFilters = useCallback(() => {
+    setShowFilters(false);
+  }, []);
+
   return (
     <Card>
       <CardHeader>
@@ -97,7 +107,7 @@ export function JournalSection({ journal, locale, onAddEntry, onDeleteEntry }: J
             selectedEmotions={selectedEmotions}
             sortBy={sortBy}
             collapsed={collapsed}
-            onOpenFilters={() => {}}
+            onOpenFilters={handleOpenFilters}
             onToggleSort={handleSortToggle}
             onToggleCollapsed={handleCollapsedToggle}
           />
@@ -117,6 +127,60 @@ export function JournalSection({ journal, locale, onAddEntry, onDeleteEntry }: J
           </div>
         )}
       </CardContent>
+      <Dialog open={showFilters} onOpenChange={setShowFilters}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("filter", locale)}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t("period", locale)}</label>
+              <div className="flex flex-wrap gap-2">
+                {(["all", "today", "week", "month", "year"] as const).map((type) => (
+                  <Button
+                    key={type}
+                    type="button"
+                    size="xs"
+                    variant={dateFilterType === type ? "default" : "outline"}
+                    onClick={() => handleFilterChange(type, selectedEmotions)}
+                  >
+                    {t(type, locale)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t("emotions", locale)}</label>
+              <div className="flex flex-wrap gap-2">
+                {["спокойствие", "энергия", "благодарность", "любовь", "гордость", "уверенность", "фокус", "вдохновение", "тревога", "грусть"].map((emotion) => (
+                  <Button
+                    key={emotion}
+                    type="button"
+                    size="xs"
+                    variant={selectedEmotions.includes(emotion) ? "default" : "outline"}
+                    onClick={() => {
+                      const newEmotions = selectedEmotions.includes(emotion)
+                        ? selectedEmotions.filter((e) => e !== emotion)
+                        : [...selectedEmotions, emotion];
+                      handleFilterChange(dateFilterType, newEmotions);
+                    }}
+                  >
+                    {t(emotion, locale)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => handleFilterChange("all", [])}>
+              {t("reset", locale)}
+            </Button>
+            <Button type="button" onClick={handleCloseFilters}>
+              {t("apply", locale)}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

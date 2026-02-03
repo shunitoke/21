@@ -27,7 +27,7 @@ import packageInfo from "../../package.json";
 
 export default function Home() {
   const [habitModalOpen, setHabitModalOpen] = useState(false);
-  const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
+  const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showSpotlight, setShowSpotlight] = useState(false);
@@ -74,6 +74,11 @@ export default function Home() {
     importData,
     completeTutorial,
   } = useAppStore();
+
+  const selectedHabit = useMemo(() => 
+    selectedHabitId ? habits.find(h => h.id === selectedHabitId) ?? null : null,
+    [selectedHabitId, habits]
+  );
 
   useEffect(() => {
     void init();
@@ -369,7 +374,7 @@ export default function Home() {
         category: payload.category ?? null,
         isPriority: payload.isPriority,
         colorToken: getCategoryColor(payload.category ?? selectedHabit.category ?? null),
-        streakGoal: payload.streakGoal !== undefined ? payload.streakGoal : selectedHabit.streakGoal ?? null,
+        streakGoal: payload.streakGoal,
         remindersPerDay: payload.remindersPerDay ?? selectedHabit.remindersPerDay,
         trackingMode: payload.trackingMode ?? selectedHabit.trackingMode,
       });
@@ -390,21 +395,21 @@ export default function Home() {
       });
     }
     setHabitModalOpen(false);
-    setSelectedHabit(null);
+    setSelectedHabitId(null);
   };
 
   const handleArchiveHabit = () => {
     if (!selectedHabit) return;
     updateHabit({ ...selectedHabit, archived: true });
     setHabitModalOpen(false);
-    setSelectedHabit(null);
+    setSelectedHabitId(null);
   };
 
   const handleDeleteHabit = () => {
     if (!selectedHabit) return;
     removeHabit(selectedHabit.id);
     setHabitModalOpen(false);
-    setSelectedHabit(null);
+    setSelectedHabitId(null);
   };
 
   const handleAddStopCrane = (item: StopCraneItem) => {
@@ -418,7 +423,7 @@ export default function Home() {
     isModalOpen: habitModalOpen,
     onCloseModal: () => {
       setHabitModalOpen(false);
-      setSelectedHabit(null);
+      setSelectedHabitId(null);
     },
     isSettingsOpen: settingsOpen,
     onCloseSettings: () => setSettingsOpen(false),
@@ -526,7 +531,7 @@ export default function Home() {
             aria-label={t("addHabit", locale)}
             onClick={() => {
               vibrationFeedback.buttonPress();
-              setSelectedHabit(null);
+              setSelectedHabitId(null);
               setHabitModalOpen(true);
             }}
             data-tutorial-target="add"
@@ -597,11 +602,11 @@ export default function Home() {
               isLoading={loading}
               onToggle={handleToggle}
               onOpen={(habit) => {
-                setSelectedHabit(habit);
+                setSelectedHabitId(habit.id);
                 setHabitModalOpen(true);
               }}
               onAdd={() => {
-                setSelectedHabit(null);
+                setSelectedHabitId(null);
                 setHabitModalOpen(true);
               }}
               onReorderHabits={handleReorderHabits}
@@ -687,7 +692,7 @@ export default function Home() {
         logs={selectedHabit ? logs.filter((log) => log.habitId === selectedHabit.id) : []}
         onClose={() => {
           setHabitModalOpen(false);
-          setSelectedHabit(null);
+          setSelectedHabitId(null);
         }}
         onArchive={handleArchiveHabit}
         onDelete={handleDeleteHabit}
