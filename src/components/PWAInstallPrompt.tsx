@@ -130,7 +130,7 @@ export function PWAInstallPrompt() {
   const rustoreButtonSrc = isDark ? "/logo-color-light.svg" : "/logo-color-dark.svg";
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-[270px]">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-[270px]">
       <div className="rounded-xl border border-border/50 bg-card/95 backdrop-blur-md p-3 shadow-lg">
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-semibold text-sm">Установить Program 21</h3>
