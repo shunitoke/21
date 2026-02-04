@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Pause, Play } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Pause, Play, Music } from "lucide-react";
 import type { Locale } from "@/lib/types";
 import { t } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -12,145 +12,209 @@ interface AudioAnchorProps {
   locale: Locale;
 }
 
-const AudioAnchor = ({ src, locale }: AudioAnchorProps) => {
+export function AudioAnchor({ src, locale }: AudioAnchorProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const wasPlayingRef = useRef(false);
+  const durationPollRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Clear duration poll on unmount
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const updateTime = () => setCurrentTime(audio.currentTime);
-    const updateDuration = () => setDuration(audio.duration || 0);
-    const handleEnded = () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-    };
-    const handleError = () => {
-      setError(t("buffering", locale));
-      setIsPlaying(false);
-      // Auto-retry after 3 seconds if it was playing
-      if (wasPlayingRef.current) {
-        if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = setTimeout(() => {
-          audio.load();
-          audio.play().then(() => {
-            setIsPlaying(true);
-            setError(null);
-          }).catch(() => {
-            setError(t("stopped", locale));
-          });
-        }, 3000);
+    return () => {
+      if (durationPollRef.current) {
+        clearInterval(durationPollRef.current);
       }
     };
-    const handleWaiting = () => {
-      setError(t("buffering", locale));
-    };
-    const handlePlaying = () => {
-      setError(null);
-      wasPlayingRef.current = true;
+  }, []);
+
+  // Initialize audio when src changes
+  useEffect(() => {
+    if (!src) return;
+
+    // Create new audio element
+    const audio = new Audio();
+    audio.preload = "metadata";
+    audio.src = src;
+    audioRef.current = audio;
+
+    // Reset states
+    setDuration(0);
+    setCurrentTime(0);
+    setError(null);
+    setIsPlaying(false);
+    setIsLoading(false);
+
+    // Load metadata - try multiple approaches for data URLs
+    const loadMetadata = () => {
+      if (audio.duration && Number.isFinite(audio.duration) && audio.duration > 0) {
+        setDuration(audio.duration);
+      }
     };
 
-    audio.addEventListener("timeupdate", updateTime);
-    audio.addEventListener("loadedmetadata", updateDuration);
-    audio.addEventListener("ended", handleEnded);
-    audio.addEventListener("error", handleError);
-    audio.addEventListener("waiting", handleWaiting);
-    audio.addEventListener("playing", handlePlaying);
+    // Check if already loaded (cached)
+    if (audio.readyState >= 1) {
+      loadMetadata();
+    }
+
+    // Also try after a small delay for data URLs that don't fire events properly
+    const timeoutId = setTimeout(() => {
+      if (audio.duration && Number.isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    }, 100);
+
+    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const onEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+      audio.currentTime = 0;
+    };
+    const onError = () => {
+      setError(t("playbackError", locale));
+      setIsPlaying(false);
+      setIsLoading(false);
+    };
+    const onWaiting = () => setIsLoading(true);
+    const onPlaying = () => {
+      setIsLoading(false);
+      setIsPlaying(true);
+    };
+    const onPause = () => setIsPlaying(false);
+
+    audio.addEventListener("loadedmetadata", loadMetadata);
+    audio.addEventListener("durationchange", loadMetadata);
+    audio.addEventListener("canplay", loadMetadata);
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("error", onError);
+    audio.addEventListener("waiting", onWaiting);
+    audio.addEventListener("playing", onPlaying);
+    audio.addEventListener("pause", onPause);
+
+    // Force load for data URLs
+    audio.load();
 
     return () => {
-      audio.removeEventListener("timeupdate", updateTime);
-      audio.removeEventListener("loadedmetadata", updateDuration);
-      audio.removeEventListener("ended", handleEnded);
-      audio.removeEventListener("error", handleError);
-      audio.removeEventListener("waiting", handleWaiting);
-      audio.removeEventListener("playing", handlePlaying);
-      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+      clearTimeout(timeoutId);
+      audio.pause();
+      audio.src = "";
+      audio.removeEventListener("loadedmetadata", loadMetadata);
+      audio.removeEventListener("durationchange", loadMetadata);
+      audio.removeEventListener("canplay", loadMetadata);
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onError);
+      audio.removeEventListener("waiting", onWaiting);
+      audio.removeEventListener("playing", onPlaying);
+      audio.removeEventListener("pause", onPause);
     };
-  }, [locale]);
+  }, [src, locale]);
 
-  const togglePlay = () => {
+  const togglePlay = useCallback(async () => {
     const audio = audioRef.current;
-    if (!audio || !src) return;
-
-    // Always reload if src changed
-    if (!isLoaded || audio.src !== src) {
-      audio.src = src;
-      audio.load();
-      setIsLoaded(true);
-    }
+    if (!audio) return;
 
     if (isPlaying) {
       audio.pause();
       setIsPlaying(false);
-      wasPlayingRef.current = false;
+      // Stop polling for duration
+      if (durationPollRef.current) {
+        clearInterval(durationPollRef.current);
+        durationPollRef.current = null;
+      }
     } else {
-      audio
-        .play()
-        .then(() => {
-          setIsPlaying(true);
-          wasPlayingRef.current = true;
-          setError(null);
-        })
-        .catch(() => {
-          setIsPlaying(false);
-          setError(t("stopped", locale));
-        });
+      setIsLoading(true);
+      try {
+        await audio.play();
+        setIsPlaying(true);
+        setError(null);
+        // Start polling for duration if not yet available (for data URLs)
+        if (!duration || duration <= 0) {
+          durationPollRef.current = setInterval(() => {
+            if (audio.duration && Number.isFinite(audio.duration) && audio.duration > 0) {
+              setDuration(audio.duration);
+              clearInterval(durationPollRef.current!);
+              durationPollRef.current = null;
+            }
+          }, 200);
+        }
+      } catch {
+        setError(t("playbackError", locale));
+        setIsPlaying(false);
+      }
+      setIsLoading(false);
     }
-  };
+  }, [isPlaying, duration, locale]);
+
+  const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    
+    const value = Number(e.target.value);
+    audio.currentTime = value;
+    setCurrentTime(value);
+  }, []);
 
   const formatTime = (time: number) => {
     if (!Number.isFinite(time) || time < 0) return "0:00";
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
+
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <Card>
-      <CardContent className="grid gap-2">
+      <CardContent className="grid gap-2 p-4">
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
           <Button
             variant="outline"
             size="icon-sm"
             onClick={togglePlay}
-            aria-label={isPlaying ? t("stopped", locale) : t("playing", locale)}
+            disabled={isLoading}
+            aria-label={isPlaying ? t("pause", locale) : t("play", locale)}
           >
-            {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+            {isLoading ? (
+              <Music size={14} className="animate-pulse" />
+            ) : isPlaying ? (
+              <Pause size={14} />
+            ) : (
+              <Play size={14} />
+            )}
           </Button>
-          <div className="grid gap-1 min-w-0">
+          <div className="grid gap-0.5 min-w-0">
             <span className="text-xs font-semibold truncate">{t("audio", locale)}</span>
-            <span className="text-sm text-muted-foreground truncate">
+            <span className={`text-sm truncate ${error ? "text-destructive" : "text-muted-foreground"}`}>
               {error || `${formatTime(currentTime)} / ${formatTime(duration)}`}
             </span>
           </div>
         </div>
-        <input
-          type="range"
-          min={0}
-          max={duration > 0 ? duration : 1}
-          step={0.1}
-          value={Math.min(currentTime, duration > 0 ? duration : 0)}
-          disabled={duration <= 0}
-          className="w-full"
-          style={{ accentColor: "var(--color-ring)" }}
-          onChange={(event) => {
-            const value = Number(event.target.value);
-            if (!audioRef.current) return;
-            audioRef.current.currentTime = value;
-            setCurrentTime(value);
-          }}
-        />
-        <audio ref={audioRef} preload="metadata" />
+        
+        {/* Progress slider */}
+        <div className="relative w-full h-2 bg-muted rounded-full overflow-hidden">
+          <div 
+            className="absolute h-full bg-primary transition-all duration-100"
+            style={{ width: `${progressPercent}%` }}
+          />
+          <input
+            type="range"
+            min={0}
+            max={duration || 100}
+            step={0.1}
+            value={Math.min(currentTime, duration || 100)}
+            onChange={handleSeek}
+            disabled={isLoading}
+            className="absolute inset-0 w-full h-full opacity-0"
+            style={{ cursor: duration > 0 ? "pointer" : "default" }}
+          />
+        </div>
       </CardContent>
     </Card>
   );
-};
+}
 
 export default AudioAnchor;

@@ -3,6 +3,7 @@
 import { useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toISODate } from "@/lib/date";
 import { vibrationFeedback } from "@/utils/vibrationUtils";
@@ -137,6 +138,34 @@ export function HabitCalendar({
     onSelectDate(toISODate(value));
   }, [onSelectDate]);
 
+  const Nav = useCallback(({ onPreviousClick, onNextClick }: { onPreviousClick?: React.MouseEventHandler<HTMLButtonElement>; onNextClick?: React.MouseEventHandler<HTMLButtonElement> }) => (
+    <div className="flex items-center gap-1 w-full absolute top-0 inset-x-0 justify-between">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 p-0"
+        onClick={onPreviousClick}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 p-0"
+        onClick={onNextClick}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  ), []);
+
+  const calendarComponents = useMemo(() => ({
+    DayButton: HabitCalendarDayButton,
+    Nav,
+  }), [HabitCalendarDayButton, Nav]);
+
   return (
     <Calendar
       mode="single"
@@ -150,7 +179,7 @@ export function HabitCalendar({
             year: "numeric",
           }),
       }}
-      components={HabitCalendarDayButton ? { DayButton: HabitCalendarDayButton } : undefined}
+      components={calendarComponents}
       onSelect={handleSelect}
       onDayClick={handleDayClick}
       onMonthChange={onMonthChange}

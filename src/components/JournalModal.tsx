@@ -104,6 +104,8 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
   const recordingRef = useRef(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [isNative, setIsNative] = useState(false);
+  const chunksRef = useRef<Blob[]>([]);
+  const recordingResolveRef = useRef<((value: string | null) => void) | null>(null);
 
   // Detect if running on native platform
   useEffect(() => {
@@ -112,16 +114,22 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
 
   const maxChars = 1000;
 
-  const stopRecording = useCallback(async () => {
+  const stopRecording = useCallback(async (): Promise<string | null> => {
     // Handle native recording
     if (isNative) {
       try {
         const result = await VoiceRecorder.stopRecording();
         if (result.value && result.value.recordDataBase64) {
-          // Convert base64 to data URL
           const mimeType = 'audio/aac';
           const dataUrl = `data:${mimeType};base64,${result.value.recordDataBase64}`;
           setAudioUrl(dataUrl);
+          setRecording(false);
+          setRecordingDuration(0);
+          if (durationIntervalRef.current) {
+            clearInterval(durationIntervalRef.current);
+            durationIntervalRef.current = null;
+          }
+          return dataUrl;
         }
       } catch (e) {
         // Silent fail
@@ -132,40 +140,177 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
         clearInterval(durationIntervalRef.current);
         durationIntervalRef.current = null;
       }
-      return;
+      return null;
     }
 
     // Handle web recording (PWA)
     const activeRecorder = recorderRef.current;
-    if (activeRecorder && activeRecorder.state !== "inactive") {
+    
+    // If recorder is already inactive or doesn't exist, resolve with current audioUrl
+    if (!activeRecorder || activeRecorder.state === "inactive") {
+      setRecording(false);
+      setRecordingDuration(0);
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+      return audioUrl;
+    }
+
+    // Return a promise that resolves when recording stops
+    return new Promise((resolve) => {
+      recordingResolveRef.current = resolve;
+      
+      // Stop the recorder - onstop handler will resolve the promise
       try {
         activeRecorder.stop();
       } catch (e) {
         // Silent fail
+        resolve(null);
       }
-    }
-    activeRecorder?.stream?.getTracks().forEach((track) => track.stop());
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    recorderRef.current = null;
-    recordingRef.current = false;
+    });
+  }, [isNative, audioUrl]);
 
-    setRecorder(null);
-    setRecording(false);
-    setRecordingDuration(0);
-    if (durationIntervalRef.current) {
-      clearInterval(durationIntervalRef.current);
-      durationIntervalRef.current = null;
+  // Start recording function - called directly from button
+  const startRecording = useCallback(async () => {
+    setRecordingError(null);
+    setAudioUrl(null);
+    chunksRef.current = [];
+    recordingRef.current = true;
+    setRecording(true);
+
+    // Native recording
+    if (isNative) {
+      try {
+        const permResult = await VoiceRecorder.hasAudioRecordingPermission();
+        if (!permResult.value) {
+          const requestResult = await VoiceRecorder.requestAudioRecordingPermission();
+          if (!requestResult.value) {
+            setRecordingError('Microphone permission denied');
+            setRecording(false);
+            return;
+          }
+        }
+        await VoiceRecorder.startRecording();
+        durationIntervalRef.current = setInterval(() => {
+          setRecordingDuration(prev => prev + 1);
+        }, 1000);
+      } catch (e) {
+        setRecordingError('Recording failed: ' + (e as Error).message);
+        setRecording(false);
+      }
+      return;
     }
 
-    const activeAudioContext = audioContextRef.current;
-    if (activeAudioContext && activeAudioContext.state !== "closed") {
-      activeAudioContext.close();
+    // Web recording
+    if (!window.MediaRecorder) {
+      setRecordingError('MediaRecorder not supported');
+      setRecording(false);
+      return;
     }
-    audioContextRef.current = null;
-    setAudioContext(null);
-    setAnalyser(null);
-    setSpectrumData(new Array(20).fill(8));
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      const mimeType = getSupportedMimeType();
+      const mediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+      
+      recorderRef.current = mediaRecorder;
+
+      // Audio context for visualization
+      try {
+        const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+        audioContextRef.current = audioCtx;
+        const source = audioCtx.createMediaStreamSource(stream);
+        const anal = audioCtx.createAnalyser();
+        anal.fftSize = 256;
+        source.connect(anal);
+        setAudioContext(audioCtx);
+        setAnalyser(anal);
+      } catch (e) {
+        // Silent fail
+      }
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          chunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const chunks = chunksRef.current;
+        if (!chunks || chunks.length === 0) {
+          setRecordingError('No audio data recorded');
+          if (recordingResolveRef.current) {
+            recordingResolveRef.current(null);
+            recordingResolveRef.current = null;
+          }
+          return;
+        }
+        const blobType = mediaRecorder.mimeType || 'audio/webm';
+        const blob = new Blob(chunks, { type: blobType });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          console.log('FileReader onloadend, result:', reader.result ? 'has data' : 'no data');
+          if (typeof reader.result === "string") {
+            console.log('Setting audioUrl, length:', reader.result.length);
+            setAudioUrl(reader.result);
+            if (recordingResolveRef.current) {
+              recordingResolveRef.current(reader.result);
+              recordingResolveRef.current = null;
+            }
+          }
+          // Cleanup
+          setRecording(false);
+          setRecordingDuration(0);
+          if (durationIntervalRef.current) {
+            clearInterval(durationIntervalRef.current);
+            durationIntervalRef.current = null;
+          }
+          streamRef.current?.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+          recorderRef.current = null;
+          recordingRef.current = false;
+          setRecorder(null);
+          const activeAudioContext = audioContextRef.current;
+          if (activeAudioContext && activeAudioContext.state !== "closed") {
+            activeAudioContext.close();
+          }
+          audioContextRef.current = null;
+          setAudioContext(null);
+          setAnalyser(null);
+          setSpectrumData(new Array(20).fill(8));
+          chunksRef.current = [];
+        };
+        reader.onerror = () => {
+          setRecordingError('Failed to process audio');
+          if (recordingResolveRef.current) {
+            recordingResolveRef.current(null);
+            recordingResolveRef.current = null;
+          }
+          setRecording(false);
+        };
+        reader.readAsDataURL(blob);
+      };
+
+      mediaRecorder.onerror = () => {
+        setRecordingError('Recording error');
+        setRecording(false);
+      };
+
+      mediaRecorder.start(100);
+      setRecorder(mediaRecorder);
+
+      durationIntervalRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      setRecordingError('Microphone access failed: ' + (err as Error).message);
+      setRecording(false);
+    }
   }, [isNative]);
 
   const handleClose = useCallback(() => {
@@ -180,7 +325,7 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
     }
     setContent("");
     setEmotions([]);
-    setAudioUrl(null);
+    // Don't reset audioUrl here - it breaks recording display
     setRecording(false);
     setRecorder(null);
     setRecordingError(null);
@@ -208,134 +353,6 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
       stopRecording();
     };
   }, [stopRecording]);
-
-  useEffect(() => {
-    if (!recording || recorder) return;
-    setRecordingError(null);
-
-    // Use native voice recorder on Capacitor
-    if (isNative) {
-      const startNativeRecording = async () => {
-        try {
-          // Check and request permission
-          const permResult = await VoiceRecorder.hasAudioRecordingPermission();
-          if (!permResult.value) {
-            const requestResult = await VoiceRecorder.requestAudioRecordingPermission();
-            if (!requestResult.value) {
-              setRecordingError('Microphone permission denied');
-              setRecording(false);
-              return;
-            }
-          }
-
-          // Start recording
-          await VoiceRecorder.startRecording();
-
-          // Start duration timer
-          durationIntervalRef.current = setInterval(() => {
-            setRecordingDuration(prev => prev + 1);
-          }, 1000);
-        } catch (e) {
-          setRecordingError('Recording failed: ' + (e as Error).message);
-          setRecording(false);
-        }
-      };
-      startNativeRecording();
-      return;
-    }
-
-    // Web recording (PWA) - original logic
-    if (!window.MediaRecorder) {
-      setRecordingError('MediaRecorder not supported in this WebView');
-      setRecording(false);
-      return;
-    }
-
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => {
-        streamRef.current = stream;
-
-        // Try to create MediaRecorder with various options
-        let mediaRecorder: MediaRecorder;
-        const mimeType = getSupportedMimeType();
-
-        try {
-          mediaRecorder = mimeType
-            ? new MediaRecorder(stream, { mimeType })
-            : new MediaRecorder(stream);
-        } catch (e) {
-          setRecordingError('Failed to create recorder: ' + (e as Error).message);
-          setRecording(false);
-          return;
-        }
-        recorderRef.current = mediaRecorder;
-
-        // Create AudioContext and Analyser for spectrum visualization
-        try {
-          const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-          audioContextRef.current = audioCtx;
-          const source = audioCtx.createMediaStreamSource(stream);
-          const anal = audioCtx.createAnalyser();
-          anal.fftSize = 256;
-          source.connect(anal);
-          setAudioContext(audioCtx);
-          setAnalyser(anal);
-        } catch (e) {
-          // Silent fail for audio context
-        }
-
-        const chunks: Blob[] = [];
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data && event.data.size > 0) {
-            chunks.push(event.data);
-          }
-        };
-
-        mediaRecorder.onstop = () => {
-          if (chunks.length === 0) {
-            setRecordingError('No audio data recorded');
-            return;
-          }
-          const blobType = mediaRecorder.mimeType || 'audio/webm';
-          const blob = new Blob(chunks, { type: blobType });
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            if (typeof reader.result === "string") {
-              setAudioUrl(reader.result);
-            }
-          };
-          reader.onerror = () => {
-            setRecordingError('Failed to process audio');
-          };
-          reader.readAsDataURL(blob);
-        };
-
-        mediaRecorder.onerror = () => {
-          setRecordingError('Recording error');
-          setRecording(false);
-        };
-
-        try {
-          mediaRecorder.start(100);
-          setRecorder(mediaRecorder);
-        } catch (e) {
-          setRecordingError('Failed to start: ' + (e as Error).message);
-          setRecording(false);
-          return;
-        }
-
-        // Start duration timer
-        durationIntervalRef.current = setInterval(() => {
-          setRecordingDuration(prev => prev + 1);
-        }, 1000);
-      })
-      .catch((err) => {
-        setRecordingError('Microphone access failed: ' + err.message);
-        setRecording(false);
-      });
-  }, [recording, recorder, isNative]);
 
   useEffect(() => {
     if (!analyser || !recording || !isPageVisible) {
@@ -385,7 +402,7 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
     };
   }, [analyser, isPageVisible, recording]);
 
-  const canSubmit = (audioUrl || content.trim().length > 0) && content.length <= maxChars;
+  const canSubmit = (audioUrl || content.trim().length > 0 || recording) && content.length <= maxChars;
 
   if (!open) return null;
 
@@ -434,9 +451,7 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
                     await stopRecording();
                     return;
                   }
-                  if (audioUrl) setAudioUrl(null);
-                  recordingRef.current = true;
-                  setRecording(true);
+                  await startRecording();
                 }}
               >
                 {recording ? <Square size={12} /> : <Mic size={12} />}
@@ -472,7 +487,10 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
               <p className="text-xs text-red-500 mt-2">{recordingError}</p>
             )}
             {recording && <p className="text-xs text-muted-foreground">{t("recording", locale)}</p>}
-            {audioUrl && <AudioAnchor src={audioUrl} locale={locale} />}
+            <div>
+              {(() => { console.log('Render audioUrl:', audioUrl ? 'exists' : 'null'); return null; })()}
+              {audioUrl ? <AudioAnchor src={audioUrl} locale={locale} /> : null}
+            </div>
           </Card>
         </div>
         <DialogFooter className="gap-2">
@@ -482,19 +500,25 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
           <Button
             type="button"
             disabled={!canSubmit}
-            onClick={() =>
+            onClick={async () => {
+              // Stop recording if active and get the audio URL
+              let finalAudioUrl = audioUrl;
+              if (recording) {
+                finalAudioUrl = await stopRecording();
+              }
+              // Submit with the final audio URL (either existing or newly recorded)
               onSubmit({
                 id: `journal-${Date.now()}`,
                 date: new Date().toISOString(),
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                 timezoneOffset: new Date().getTimezoneOffset(),
-                type: audioUrl ? "audio" : "text",
+                type: finalAudioUrl ? "audio" : "text",
                 encryptedContent: "",
-                content: audioUrl ?? content.trim(),
-                textContent: audioUrl ? content.trim() || undefined : undefined,
+                content: finalAudioUrl ?? content.trim(),
+                textContent: finalAudioUrl ? content.trim() || undefined : undefined,
                 emotions,
-              })
-            }
+              });
+            }}
           >
             {t("save", locale)}
           </Button>

@@ -707,6 +707,42 @@ export const dictionary: Dictionary = {
     ru: "Присоединиться",
     en: "Join",
   },
+  pause: {
+    ru: "Пауза",
+    en: "Pause",
+  },
+  play: {
+    ru: "Воспроизвести",
+    en: "Play",
+  },
+  connecting: {
+    ru: "Подключение...",
+    en: "Connecting...",
+  },
+  reconnecting: {
+    ru: "Переподключение",
+    en: "Reconnecting",
+  },
+  connectionFailed: {
+    ru: "Не удалось подключиться",
+    en: "Connection failed",
+  },
+  noConnection: {
+    ru: "Нет соединения",
+    en: "No connection",
+  },
+  streamNotAvailable: {
+    ru: "Поток недоступен",
+    en: "Stream not available",
+  },
+  networkError: {
+    ru: "Ошибка сети",
+    en: "Network error",
+  },
+  playbackError: {
+    ru: "Ошибка воспроизведения",
+    en: "Playback error",
+  },
 };
 
 export const t = (key: keyof typeof dictionary, locale: Locale) => {
