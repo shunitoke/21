@@ -159,8 +159,8 @@ export function ProgressChart({
   };
 
   return (
-    <div className="overflow-hidden" style={{ touchAction: "pan-y", contain: "layout paint" }}>
-      <ChartContainer config={chartConfig} className="h-[200px] w-full" style={{ touchAction: "pan-y" }}>
+    <div className="overflow-hidden pointer-events-none" style={{ touchAction: "pan-y", contain: "layout paint" }}>
+      <ChartContainer config={chartConfig} className="h-[200px] w-full pointer-events-auto" style={{ touchAction: "pan-y" }}>
         <ComposedChart data={dataWithHandlers} margin={{ top: 28, left: 12, right: 12, bottom: 6 }}>
           <CartesianGrid vertical={false} />
           <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />

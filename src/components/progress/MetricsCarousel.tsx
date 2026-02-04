@@ -65,10 +65,10 @@ export function MetricsCarousel({
     <Carousel
       opts={{ align: "start", loop: true, watchDrag: false, watchSlides: false }}
       setApi={setApi}
-      className="relative max-w-full overflow-hidden"
+      className="relative max-w-full overflow-hidden pointer-events-none"
       style={{ touchAction: "pan-y", contain: "layout paint" }}
     >
-      <CarouselContent className="max-w-full">
+      <CarouselContent className="max-w-full pointer-events-auto">
         {metrics.map((metric, index) => (
           <CarouselItem
             key={`${metric.title}-${index}`}
