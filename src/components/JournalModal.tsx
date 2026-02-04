@@ -102,9 +102,9 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
   const recorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const recordingRef = useRef(false);
+  const isStoppingRef = useRef(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [isNative, setIsNative] = useState(false);
-  const chunksRef = useRef<Blob[]>([]);
   const recordingResolveRef = useRef<((value: string | null) => void) | null>(null);
 
   // Detect if running on native platform
@@ -115,6 +115,8 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
   const maxChars = 1000;
 
   const stopRecording = useCallback(async (): Promise<string | null> => {
+    isStoppingRef.current = true;
+    
     // Handle native recording
     if (isNative) {
       try {
@@ -129,6 +131,7 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
             clearInterval(durationIntervalRef.current);
             durationIntervalRef.current = null;
           }
+          isStoppingRef.current = false;
           return dataUrl;
         }
       } catch (e) {
@@ -140,6 +143,7 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
         clearInterval(durationIntervalRef.current);
         durationIntervalRef.current = null;
       }
+      isStoppingRef.current = false;
       return null;
     }
 
@@ -154,18 +158,23 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
         clearInterval(durationIntervalRef.current);
         durationIntervalRef.current = null;
       }
+      isStoppingRef.current = false;
       return audioUrl;
     }
 
     // Return a promise that resolves when recording stops
     return new Promise((resolve) => {
-      recordingResolveRef.current = resolve;
+      recordingResolveRef.current = (value) => {
+        isStoppingRef.current = false;
+        resolve(value);
+      };
       
       // Stop the recorder - onstop handler will resolve the promise
       try {
         activeRecorder.stop();
       } catch (e) {
         // Silent fail
+        isStoppingRef.current = false;
         resolve(null);
       }
     });
@@ -173,9 +182,32 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
 
   // Start recording function - called directly from button
   const startRecording = useCallback(async () => {
+    // Wait if currently stopping
+    while (isStoppingRef.current) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    // Clean up any existing stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    recorderRef.current = null;
+    recordingRef.current = false;
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
+    }
+    const activeAudioContext = audioContextRef.current;
+    if (activeAudioContext && activeAudioContext.state !== "closed") {
+      activeAudioContext.close();
+    }
+    audioContextRef.current = null;
+    setAudioContext(null);
+    setAnalyser(null);
+    
     setRecordingError(null);
     setAudioUrl(null);
-    chunksRef.current = [];
     recordingRef.current = true;
     setRecording(true);
 
@@ -234,14 +266,19 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
         // Silent fail
       }
 
+      const chunks: Blob[] = [];
+
       mediaRecorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
-          chunksRef.current.push(event.data);
+          chunks.push(event.data);
         }
       };
 
       mediaRecorder.onstop = () => {
-        const chunks = chunksRef.current;
+        // Guard: ignore if this is not the current recorder anymore
+        if (recorderRef.current !== mediaRecorder) {
+          return;
+        }
         if (!chunks || chunks.length === 0) {
           setRecordingError('No audio data recorded');
           if (recordingResolveRef.current) {
@@ -254,9 +291,11 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
         const blob = new Blob(chunks, { type: blobType });
         const reader = new FileReader();
         reader.onloadend = () => {
-          console.log('FileReader onloadend, result:', reader.result ? 'has data' : 'no data');
+          // Guard: ignore if this is not the current recorder anymore
+          if (recorderRef.current !== mediaRecorder) {
+            return;
+          }
           if (typeof reader.result === "string") {
-            console.log('Setting audioUrl, length:', reader.result.length);
             setAudioUrl(reader.result);
             if (recordingResolveRef.current) {
               recordingResolveRef.current(reader.result);
@@ -283,10 +322,8 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
           setAudioContext(null);
           setAnalyser(null);
           setSpectrumData(new Array(20).fill(8));
-          chunksRef.current = [];
         };
         reader.onerror = () => {
-          setRecordingError('Failed to process audio');
           if (recordingResolveRef.current) {
             recordingResolveRef.current(null);
             recordingResolveRef.current = null;
@@ -318,18 +355,26 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
     onClose();
   }, [onClose, stopRecording]);
 
+  // Track previous open state to only reset on actual modal open
+  const wasOpenRef = useRef(false);
+
   useEffect(() => {
-    if (!open) {
-      stopRecording();
-      return;
+    if (open && !wasOpenRef.current) {
+      // Modal just opened - reset everything
+      setContent("");
+      setEmotions([]);
+      setAudioUrl(null);
+      setRecording(false);
+      setRecorder(null);
+      setRecordingError(null);
     }
-    setContent("");
-    setEmotions([]);
-    // Don't reset audioUrl here - it breaks recording display
-    setRecording(false);
-    setRecorder(null);
-    setRecordingError(null);
-  }, [open, stopRecording]);
+    wasOpenRef.current = open;
+    
+    if (!open) {
+      // Modal closed - stop recording
+      stopRecording();
+    }
+  }, [open]); // Only depend on open, not stopRecording
 
   useEffect(() => {
     recordingRef.current = recording;
@@ -443,7 +488,7 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
             <div className="flex items-center justify-between gap-3">
               <Button
                 size="xs"
-                variant={recording ? "destructive" : "outline"}
+                variant={recording ? "destructive" : audioUrl ? "destructive" : "outline"}
                 type="button"
                 onClick={async () => {
                   if (recording) {
@@ -451,11 +496,17 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
                     await stopRecording();
                     return;
                   }
+                  if (audioUrl) {
+                    // First click: delete existing recording
+                    setAudioUrl(null);
+                    return;
+                  }
+                  // Second click: start new recording
                   await startRecording();
                 }}
               >
-                {recording ? <Square size={12} /> : <Mic size={12} />}
-                {recording ? t("stopRecording", locale) : t("recordAudio", locale)}
+                {recording ? <Square size={12} /> : audioUrl ? <Square size={12} /> : <Mic size={12} />}
+                {recording ? t("stopRecording", locale) : audioUrl ? t("deleteRecording", locale) : t("recordAudio", locale)}
               </Button>
               {recording && (
                 <div className="flex-1 flex items-center justify-center gap-[3px] h-6 px-2">
@@ -488,7 +539,6 @@ const JournalModal = ({ open, locale, onClose, onSubmit }: JournalModalProps) =>
             )}
             {recording && <p className="text-xs text-muted-foreground">{t("recording", locale)}</p>}
             <div>
-              {(() => { console.log('Render audioUrl:', audioUrl ? 'exists' : 'null'); return null; })()}
               {audioUrl ? <AudioAnchor src={audioUrl} locale={locale} /> : null}
             </div>
           </Card>

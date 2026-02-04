@@ -563,6 +563,14 @@ export const dictionary: Dictionary = {
     ru: "Записать голос",
     en: "Record audio",
   },
+  reRecord: {
+    ru: "Перезаписать",
+    en: "Re-record",
+  },
+  deleteRecording: {
+    ru: "Удалить запись",
+    en: "Delete recording",
+  },
   stopRecording: {
     ru: "Остановить",
     en: "Stop",

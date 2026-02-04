@@ -4,8 +4,16 @@ const decoder = new TextDecoder();
 const base64ToBytes = (base64: string) =>
   Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
 
-const bytesToBase64 = (bytes: Uint8Array) =>
-  btoa(String.fromCharCode(...Array.from(bytes)));
+const bytesToBase64 = (bytes: Uint8Array) => {
+  // Use chunking to avoid stack overflow with large arrays
+  const chunkSize = 65536; // Process 64KB at a time
+  let result = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    result += String.fromCharCode(...Array.from(chunk));
+  }
+  return btoa(result);
+};
 
 export const createKeyMaterial = () => crypto.getRandomValues(new Uint8Array(32));
 
