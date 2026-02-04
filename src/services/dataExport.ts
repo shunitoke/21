@@ -62,8 +62,8 @@ export async function exportEncryptedArchive(password: string): Promise<Blob> {
     version: 1,
     exportedAt: new Date().toISOString(),
     data: {
-      // Exclude theme, locale, ally from export - these are device/user preferences
-      settings: { ...data.settings, theme: "system", locale: "ru", ally: "friend" },
+      // Exclude theme, locale, ally, notificationSettings from export - these are device/user preferences
+      settings: { ...data.settings, theme: "system", locale: "ru", ally: "friend", notificationSettings: { enabled: false, frequency: "normal", startHour: 9, endHour: 22 } },
       habits: data.habits,
       logs: data.logs,
       journal: data.journal.map(j => ({ ...j, content: j.content || "" })),

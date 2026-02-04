@@ -166,7 +166,10 @@ export function AchievementsSection({ achievements, habits, locale }: Achievemen
     [groupedAchievements]
   );
 
-  const visibleAchievements = showAll ? flatGrouped : flatGrouped.slice(0, maxAchievements);
+  // Preview: all priority achievements
+  const previewAchievements = groupedAchievements.priority;
+  // Expanded: all other achievements (excluding priority)
+  const expandedAchievements = flatGrouped.filter(a => !groupedAchievements.priority.includes(a));
 
   const groupLabels: Record<AchievementGroup, string> = {
     priority: t("achievementsPriorityHabits", locale),
@@ -176,10 +179,8 @@ export function AchievementsSection({ achievements, habits, locale }: Achievemen
     discipline: t("achievementsDiscipline", locale),
   };
 
-  const visibleBuckets = useMemo<Record<AchievementGroup, Achievement[]>>(() => {
-    if (showAll) return groupedAchievements;
-    const remaining = new Map<AchievementGroup, number>();
-    achievementGroupOrder.forEach((group) => remaining.set(group, groupedAchievements[group].length));
+  // Group achievements for expanded section (non-priority)
+  const expandedBuckets = useMemo<Record<AchievementGroup, Achievement[]>>(() => {
     const bucket: Record<AchievementGroup, Achievement[]> = {
       priority: [],
       habit: [],
@@ -187,40 +188,54 @@ export function AchievementsSection({ achievements, habits, locale }: Achievemen
       journal: [],
       discipline: [],
     };
-    visibleAchievements.forEach((achievement) => {
+    expandedAchievements.forEach((achievement) => {
       const group = getAchievementGroup(achievement);
-      if ((remaining.get(group) ?? 0) <= 0) return;
       bucket[group].push(achievement);
-      remaining.set(group, (remaining.get(group) ?? 0) - 1);
     });
     return bucket;
-  }, [getAchievementGroup, groupedAchievements, showAll, visibleAchievements]);
+  }, [getAchievementGroup, expandedAchievements]);
 
   if (unlockedAchievements.length === 0) {
     return <p className="text-xs text-muted-foreground">{t("noUnlockedAchievements", locale)}</p>;
   }
 
   return (
-    <Collapsible open={showAll} onOpenChange={setShowAll}>
-      <div className="grid gap-4" style={{ contain: "layout" }}>
-        {achievementGroupOrder.map((group) => {
-          const items = visibleBuckets[group];
-          if (!items?.length) return null;
-          return <AchievementGroup key={group} title={groupLabels[group]} achievements={items} locale={locale} />;
-        })}
-      </div>
-      {unlockedAchievements.length > maxAchievements && (
-        <div
-          className="mt-3 flex justify-center overflow-hidden"
-          style={{ width: "100%", maxWidth: "100vw", overflow: "hidden", boxSizing: "border-box", minWidth: "0", flexShrink: "1", flexBasis: "0" }}
-        >
-          <CollapsibleTrigger asChild>
-            <Button type="button" variant="outline">
-              {showAll ? t("collapseAll", locale) : t("showMore", locale)}
-            </Button>
-          </CollapsibleTrigger>
+    <div className="grid gap-4">
+      {/* Preview - priority achievements always visible */}
+      {groupedAchievements.priority.length > 0 && (
+        <div className="grid gap-4" style={{ contain: "layout" }}>
+          <AchievementGroup 
+            title={groupLabels.priority} 
+            achievements={groupedAchievements.priority} 
+            locale={locale} 
+          />
         </div>
       )}
-    </Collapsible>
+      
+      {/* Expanded section - all other achievements */}
+      {expandedAchievements.length > 0 && (
+        <Collapsible open={showAll} onOpenChange={setShowAll}>
+          <CollapsibleContent>
+            <div className="grid gap-4" style={{ contain: "layout" }}>
+              {achievementGroupOrder.map((group) => {
+                const items = expandedBuckets[group];
+                if (!items?.length || group === 'priority') return null;
+                return <AchievementGroup key={`expanded-${group}`} title={groupLabels[group]} achievements={items} locale={locale} />;
+              })}
+            </div>
+          </CollapsibleContent>
+          <div
+            className="mt-3 flex justify-center overflow-hidden"
+            style={{ width: "100%", maxWidth: "100vw", overflow: "hidden", boxSizing: "border-box", minWidth: "0", flexShrink: "1", flexBasis: "0" }}
+          >
+            <CollapsibleTrigger asChild>
+              <Button type="button" variant="outline">
+                {showAll ? t("collapseAll", locale) : t("showMore", locale)}
+              </Button>
+            </CollapsibleTrigger>
+          </div>
+        </Collapsible>
+      )}
+    </div>
   );
 }

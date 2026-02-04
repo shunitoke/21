@@ -1,6 +1,6 @@
 {
   "name": "21",
-  "version": "0.9.21",
+  "version": "0.9.31",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -53,6 +53,7 @@
     "react-dom": "19.2.3",
     "recharts": "^2.15.4",
     "tailwind-merge": "^3.4.0",
+    "yet-another-react-lightbox": "^3.28.0",
     "zustand": "^5.0.10"
   },
   "devDependencies": {

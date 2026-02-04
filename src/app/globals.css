@@ -330,7 +330,6 @@ body {
   padding-left: var(--safe-area-left);
   padding-right: var(--safe-area-right);
   scrollbar-gutter: stable;
-  overflow-y: scroll;
   max-width: 100vw;
   overflow-x: hidden;
 }
@@ -404,31 +403,32 @@ html {
   }
 }
 
-body:has([data-slot="dialog-overlay"]) {
-  --modal-blur-active: 1;
+/* Prevent Radix Dialog from modifying body styles */
+html body[style*="padding-right"] {
+  padding-right: 0 !important;
 }
 
-body:has([data-slot="dialog-overlay"]) .app-root,
-body:has([data-slot="alert-dialog-overlay"]) .app-root {
-  filter: blur(14px) saturate(1.2);
-  transition: filter var(--transition-normal) ease;
-  transform: translateZ(0);
-  will-change: filter;
+html body[style*="overflow: hidden"] {
+  overflow: visible !important;
 }
 
-@supports ((backdrop-filter: blur(0)) or (-webkit-backdrop-filter: blur(0))) {
-  [data-slot="dialog-overlay"],
-  [data-slot="alert-dialog-overlay"] {
-    background: var(--modal-overlay);
-  }
+html body[data-scroll-locked] {
+  overflow: visible !important;
+  padding-right: 0 !important;
 }
 
-[data-slot="dialog-overlay"],
-[data-slot="alert-dialog-overlay"] {
-  background: var(--modal-overlay-strong);
-  backdrop-filter: blur(32px) saturate(1.4);
-  -webkit-backdrop-filter: blur(32px) saturate(1.4);
-  contain: layout paint;
-  will-change: opacity;
+/* Lightbox buttons - move down below status bar on Android */
+.yarl__button {
+  margin-top: env(safe-area-inset-top, 0px) !important;
+}
+
+.yarl__toolbar {
+  padding-top: env(safe-area-inset-top, 0px) !important;
+}
+
+/* Blur background when dialog is open */
+body:has([data-slot="dialog-overlay"]) .app-root {
+  filter: blur(4px);
+  transition: filter 0.2s ease;
 }
 

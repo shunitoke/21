@@ -275,6 +275,10 @@ export default function Home() {
       if (clamped === currentIndex) return;
       const dir = Math.sign(clamped - currentIndex);
       flushSync(() => setTransitionDir(dir));
+      // Reset scroll immediately before changing screen
+      const root = document.querySelector<HTMLDivElement>(".app-root");
+      if (root) root.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
       setScreen(mainScreens[clamped]);
     },
     [mainScreenIndex, mainScreens, screen, setScreen]
@@ -290,6 +294,10 @@ export default function Home() {
       } else {
         flushSync(() => setTransitionDir(0));
       }
+      // Reset scroll immediately before changing screen
+      const root = document.querySelector<HTMLDivElement>(".app-root");
+      if (root) root.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
       setScreen(next);
     },
     [mainScreenIndex, screen, setScreen]

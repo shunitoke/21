@@ -9,6 +9,7 @@ import type {
   UserSettings,
 } from "@/lib/types";
 import { DEMO_STATE_KEY, loadState, saveState, saveThemePreference } from "@/services/storage";
+const STATE_KEY = "app";
 import {
   defaultHabits,
   defaultJournal,
@@ -422,10 +423,12 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
     }
 
     if (persisted.settings.demoMode) {
-      // Always use fresh demo data from demo.ts, not from IndexedDB
+      // Load notification settings from main storage, everything else from demo
+      const mainState = await loadState(STATE_KEY);
+      const notificationSettings = mainState?.settings?.notificationSettings ?? persisted.settings.notificationSettings;
       const tutorialCompleted = persisted.settings.tutorialCompleted;
       set({
-        settings: { ...demoSettings, tutorialCompleted, demoMode: true },
+        settings: { ...demoSettings, notificationSettings, tutorialCompleted, demoMode: true },
         habits: [...demoHabits, ...demoArchivedHabits],
         logs: demoLogs,
         journal: demoJournal,
@@ -435,7 +438,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
       });
       await persistState(
         {
-          settings: { ...demoSettings, tutorialCompleted, demoMode: true },
+          settings: { ...demoSettings, notificationSettings, tutorialCompleted, demoMode: true },
           habits: [...demoHabits, ...demoArchivedHabits],
           logs: demoLogs,
           journal: demoJournal,
@@ -476,6 +479,8 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
     if (enabled) {
       const currentTheme = get().settings.theme;
       const currentLocale = get().settings.locale;
+      const currentAlly = get().settings.ally;
+      const currentNotifications = get().settings.notificationSettings;
       const tutorialCompleted = get().settings.tutorialCompleted;
       persistThemePreference(currentTheme);
       const mainSnapshot = {
@@ -487,7 +492,7 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
       };
       set({
         screen: "home",
-        settings: { ...demoSettings, theme: currentTheme, locale: currentLocale, demoMode: true, tutorialCompleted },
+        settings: { ...demoSettings, theme: currentTheme, locale: currentLocale, ally: currentAlly, notificationSettings: currentNotifications, demoMode: true, tutorialCompleted },
         habits: [...demoHabits, ...demoArchivedHabits],
         logs: demoLogs,
         journal: demoJournal,
@@ -498,10 +503,9 @@ export const useAppStore = create<AppState>((set: SetState, get: GetState) => ({
       persistThemePreference(currentTheme);
       void (async () => {
         await persistState(mainSnapshot, false);
-        // Always use fresh demo data from demo.ts, not from IndexedDB
         await persistState(
           {
-            settings: { ...demoSettings, theme: currentTheme, locale: currentLocale, demoMode: true, tutorialCompleted },
+            settings: { ...demoSettings, theme: currentTheme, locale: currentLocale, ally: currentAlly, notificationSettings: currentNotifications, demoMode: true, tutorialCompleted },
             habits: [...demoHabits, ...demoArchivedHabits],
             logs: demoLogs,
             journal: demoJournal,

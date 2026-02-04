@@ -55,11 +55,42 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  // Reset body styles to prevent content shift on Android
+  React.useEffect(() => {
+    const body = document.body
+    
+    // Use MutationObserver to prevent Radix from adding scroll-lock styles
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes') {
+          if (body.hasAttribute('data-scroll-locked')) {
+            body.removeAttribute('data-scroll-locked')
+          }
+          if (body.style.paddingRight && body.style.paddingRight !== '0px') {
+            body.style.paddingRight = ''
+          }
+          if (body.style.overflow === 'hidden') {
+            body.style.overflow = ''
+          }
+        }
+      })
+    })
+    
+    observer.observe(body, { 
+      attributes: true, 
+      attributeFilter: ['style', 'data-scroll-locked'] 
+    })
+    
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
         className={cn(
           "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none sm:max-w-lg",
           className
