@@ -148,18 +148,16 @@ const SortableItem = ({
         style={{ boxShadow: isDragging ? "0 25px 50px rgba(0,0,0,0.35)" : "0 4px 12px rgba(0,0,0,0.08)" }}
       >
         <CardContent className="grid gap-3 px-3">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground"
-              aria-label={t("drag", locale)}
-              style={{ touchAction: "none" }}
-              {...attributes}
-              {...listeners}
-            >
+          <div 
+            className="flex items-center justify-between"
+            style={{ touchAction: "none", cursor: isDragging ? "grabbing" : "grab" }}
+            {...attributes}
+            {...listeners}
+          >
+            <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
               <GripVertical size={14} />
               {item.type}
-            </button>
+            </span>
             <Button
               size="icon-sm"
               variant="outline"
