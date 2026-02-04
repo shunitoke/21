@@ -1,6 +1,6 @@
 {
   "name": "21",
-  "version": "0.9.32",
+  "version": "0.9.33",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -17,6 +17,7 @@
     "@capacitor/app": "^8.0.0",
     "@capacitor/cli": "^8.0.2",
     "@capacitor/core": "^8.0.2",
+    "@capacitor/filesystem": "^8.1.0",
     "@capacitor/haptics": "^8.0.0",
     "@capacitor/local-notifications": "^8.0.0",
     "@capacitor/status-bar": "^8.0.0",

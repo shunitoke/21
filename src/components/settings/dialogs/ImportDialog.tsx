@@ -28,12 +28,14 @@ export function ImportDialog({ open, locale, onClose, onImport }: ImportDialogPr
   const [password, setPassword] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [importFileName, setImportFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImportFile(file);
+    setImportFileName(file.name);
     setImportError(null);
     e.target.value = "";
   };
@@ -54,6 +56,7 @@ export function ImportDialog({ open, locale, onClose, onImport }: ImportDialogPr
   const reset = () => {
     setPassword("");
     setImportFile(null);
+    setImportFileName(null);
     setImportError(null);
   };
 
@@ -91,7 +94,7 @@ export function ImportDialog({ open, locale, onClose, onImport }: ImportDialogPr
           </div>
         ) : (
           <div className="py-4 space-y-4">
-            <p className="text-sm text-muted-foreground">{importFile.name}</p>
+            <p className="text-sm text-muted-foreground">{importFileName}</p>
             <Input
               type="password"
               placeholder={t("passwordPlaceholder", locale)}
