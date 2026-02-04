@@ -21,6 +21,7 @@ import { InteractiveTutorial } from "@/components/InteractiveTutorial";
 import { Spotlight } from "@/components/Spotlight";
 import { vibrationFeedback } from "@/utils/vibrationUtils";
 import { useSafeArea } from "@/hooks/useSafeArea";
+import { useStatusBar } from "@/hooks/useStatusBar";
 import { useBackButton } from "@/hooks/useBackButton";
 import { requestNotificationPermission, scheduleNotifications } from "@/services/notifications";
 import packageInfo from "../../package.json";
@@ -38,11 +39,12 @@ export default function Home() {
   const [radioPlaying, setRadioPlaying] = useState(false);
   const [radioBuffering, setRadioBuffering] = useState(false);
   const [exitToast, setExitToast] = useState("");
+  const [isDarkTheme, setIsDarkTheme] = useState(false);
   const radioAudioRef = useRef<HTMLAudioElement | null>(null);
   const pendingScrollResetRef = useRef(false);
   const didSwipeRef = useRef(false);
   const dragStartXRef = useRef<number | null>(null);
-  const safeArea = useSafeArea();
+  useStatusBar(isDarkTheme);
 
   const {
     screen,
@@ -155,6 +157,7 @@ export default function Home() {
       } else {
         resolvedMode = mode;
       }
+      setIsDarkTheme(resolvedMode === "dark");
       root.dataset.theme = resolvedMode;
       root.dataset.appearance = resolvedMode;
       // Update background color immediately
