@@ -432,3 +432,17 @@ body:has([data-slot="dialog-overlay"]) .app-root {
   transition: filter 0.2s ease;
 }
 
+/* Hide bottom navigation when any dialog/modal is open */
+body:has([data-slot="dialog-overlay"]) .app-root > nav,
+body:has([data-slot="dialog-overlay"]) nav {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Also hide nav when alert-dialog is open */
+body:has([data-slot="alert-dialog-overlay"]) .app-root > nav,
+body:has([data-slot="alert-dialog-overlay"]) nav {
+  opacity: 0;
+  pointer-events: none;
+}
+

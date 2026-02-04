@@ -472,7 +472,7 @@ export const dictionary: Dictionary = {
     en: "Reset",
   },
   showMore: {
-    ru: "Показать ещё",
+    ru: "Развернуть",
     en: "Show more",
   },
   entryTypeText: {
