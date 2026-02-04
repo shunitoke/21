@@ -20,7 +20,6 @@ import { getThemePreference } from "@/services/storage";
 import { InteractiveTutorial } from "@/components/InteractiveTutorial";
 import { Spotlight } from "@/components/Spotlight";
 import { vibrationFeedback } from "@/utils/vibrationUtils";
-import { useSafeArea } from "@/hooks/useSafeArea";
 import { useStatusBar } from "@/hooks/useStatusBar";
 import { useBackButton } from "@/hooks/useBackButton";
 import { requestNotificationPermission, scheduleNotifications } from "@/services/notifications";
@@ -482,8 +481,8 @@ export default function Home() {
 
   return (
     <div
-      className="app-root flex min-h-[100svh] flex-col w-full max-w-full box-border overflow-x-hidden px-4 pb-28 pt-4 text-foreground"
-      style={{ maxWidth: '100vw', overflowX: 'hidden', touchAction: 'pan-y' }}
+      className="app-root flex min-h-[100svh] flex-col w-full max-w-full box-border overflow-x-hidden px-4 pb-28 text-foreground"
+      style={{ maxWidth: '100vw', overflowX: 'hidden', touchAction: 'pan-y', paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))', paddingBottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }}
       onClickCapture={(event) => {
         if (!didSwipeRef.current) return;
         event.preventDefault();
@@ -653,7 +652,7 @@ export default function Home() {
       </AnimatePresence>
       </div>
       <audio ref={radioAudioRef} preload="none" />
-      <nav className="fixed inset-x-0 bottom-4 z-40 flex justify-center translate-z-0">
+      <nav className="fixed inset-x-0 z-40 flex justify-center translate-z-0" style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
         <div className="flex items-center gap-3 rounded-full border border-border/60 bg-background/80 px-4 py-3 shadow-lg backdrop-blur-md">
           <Button
             type="button"

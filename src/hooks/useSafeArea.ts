@@ -20,13 +20,26 @@ export function useSafeArea(): SafeAreaInsets {
   useEffect(() => {
     const updateInsets = () => {
       const computedStyle = getComputedStyle(document.documentElement);
-      const top = parseInt(computedStyle.getPropertyValue("--safe-area-top") || "0", 10);
-      setInsets({ top, bottom: 0, left: 0, right: 0 });
+      // Plugin injects these CSS variables automatically
+      const top = parseInt(computedStyle.getPropertyValue("--safe-area-inset-top") || "0", 10);
+      const bottom = parseInt(computedStyle.getPropertyValue("--safe-area-inset-bottom") || "0", 10);
+      const left = parseInt(computedStyle.getPropertyValue("--safe-area-inset-left") || "0", 10);
+      const right = parseInt(computedStyle.getPropertyValue("--safe-area-inset-right") || "0", 10);
+      setInsets({ top, bottom, left, right });
     };
 
-    updateInsets();
+    // Initial update with small delay to let plugin inject variables
+    const timeoutId = setTimeout(updateInsets, 100);
+
+    // Listen for resize events
     window.addEventListener("resize", updateInsets);
-    return () => window.removeEventListener("resize", updateInsets);
+    window.addEventListener("orientationchange", updateInsets);
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener("resize", updateInsets);
+      window.removeEventListener("orientationchange", updateInsets);
+    };
   }, []);
 
   return insets;

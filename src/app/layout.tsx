@@ -85,7 +85,6 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <style>{`html,body{background-color:#fff;color-scheme:light}`}</style>
         <script dangerouslySetInnerHTML={{__html: `(function(){var h=document.documentElement,m=window.matchMedia,c=document.cookie.match(/program21\\.theme=([^;]+)/),t=c?c[1]:'system',b='#fff',cs='light';if(t==='dark'||(t==='system'&&m&&m('(prefers-color-scheme: dark)').matches)){b='#0a0b0f';cs='dark';}h.style.backgroundColor=b;h.style.colorScheme=cs;})();`}} />
         <link
           rel="preload"
