@@ -284,8 +284,8 @@ export default function ProgressScreen({
 
   return (
     <div className="grid gap-6 max-w-full" style={{ maxWidth: '100vw', width: '100%', minWidth: '0', flexShrink: '1', flexBasis: '0', boxSizing: 'border-box', touchAction: 'pan-y' }}>
-      <Card className="w-full max-w-full overflow-hidden">
-        <CardContent className="space-y-6">
+      <Card className="w-full max-w-full overflow-hidden pointer-events-none">
+        <CardContent className="space-y-6 pointer-events-auto">
           <MetricsCarousel
             metrics={carouselMetrics}
             locale={locale}
@@ -299,7 +299,7 @@ export default function ProgressScreen({
 
           <div className="space-y-4 pt-3">
             <div className="flex min-w-0 items-start justify-between gap-3">
-              <div>
+              <div className="pointer-events-none">
                 <p className="text-base font-semibold">{t("dynamics", locale)}</p>
                 <p className="text-xs text-muted-foreground">
                   {chartMode === "week" ? t("periodWeek", locale) : chartMode === "month" ? t("period30Days", locale) : t("periodYear", locale)}
@@ -364,21 +364,23 @@ export default function ProgressScreen({
 
           <Separator className="my-3" />
 
-          <div style={{ maxWidth: "100vw", overflowX: "hidden" }}>
+          <div style={{ maxWidth: "100vw", overflowX: "hidden", pointerEvents: 'none' }}>
             <table className="w-full table-fixed text-sm">
               <tbody>
                 <tr>
                   <td className="w-1/3 align-top px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("totalDoneAll", locale)}</p>
-                    <p className="mt-2 text-xl font-semibold tabular-nums">
-                      <CountUpValue key={`total-${metricsAnimationKey}`} value={totalDone} enabled={metricAnimationEnabled} />
-                    </p>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("totalDoneAll", locale)}</p>
+                      <p className="mt-2 text-xl font-semibold tabular-nums">
+                        <CountUpValue key={`total-${metricsAnimationKey}`} value={totalDone} enabled={metricAnimationEnabled} />
+                      </p>
+                    </div>
                   </td>
                   <td className="w-1/3 align-top px-3 py-2" style={{ maxWidth: "100%", overflowX: "hidden", minWidth: "0" }}>
-                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("avgRhythm", locale)}</p>
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground pointer-events-none">{t("avgRhythm", locale)}</p>
                     <div className="mt-2 flex items-center justify-start overflow-hidden" style={{ maxWidth: "96px", overflowX: "hidden", minWidth: "96px", width: "96px" }}>
                       <div className="relative overflow-hidden" style={{ maxWidth: "96px", overflowX: "hidden", minWidth: "96px", width: "96px" }}>
-                        <ChartContainer config={chartConfig} className="aspect-square w-[96px]" style={{ maxWidth: "96px", overflowX: "hidden", minWidth: "96px", width: "96px", touchAction: "pan-y" }}>
+                        <ChartContainer config={chartConfig} className="aspect-square w-[96px]" style={{ maxWidth: "96px", overflowX: "hidden", minWidth: "96px", width: "96px", touchAction: "pan-y", pointerEvents: 'auto' }}>
                           <RadialBarChart data={rhythmChartData} innerRadius={34} outerRadius={44} startAngle={90} endAngle={-270}>
                             <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
                             <ChartTooltipContent hideLabel nameKey="rhythm" />
@@ -392,10 +394,12 @@ export default function ProgressScreen({
                     </div>
                   </td>
                   <td className="w-1/3 align-top px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("activeHabits", locale)}</p>
-                    <p className="mt-2 text-xl font-semibold tabular-nums">
-                      <CountUpValue key={`active-${metricsAnimationKey}`} value={filteredHabits.length} enabled={metricAnimationEnabled} />
-                    </p>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("activeHabits", locale)}</p>
+                      <p className="mt-2 text-xl font-semibold tabular-nums">
+                        <CountUpValue key={`active-${metricsAnimationKey}`} value={filteredHabits.length} enabled={metricAnimationEnabled} />
+                      </p>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -404,25 +408,25 @@ export default function ProgressScreen({
         </CardContent>
       </Card>
 
-      <Card className="w-full max-w-full">
-        <CardHeader className="space-y-2">
+      <Card className="w-full max-w-full pointer-events-none">
+        <CardHeader className="space-y-2 pointer-events-auto">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-base">{t("progressQuote", locale)}</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="space-y-1">
+        <CardContent className="space-y-1 pointer-events-auto">
           <QuoteRotator locale={locale} />
         </CardContent>
       </Card>
 
-      <Card className="w-full overflow-visible">
-        <CardHeader>
+      <Card className="w-full overflow-visible pointer-events-none">
+        <CardHeader className="pointer-events-auto">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">{t("achievements", locale)}</CardTitle>
             <span className="text-xs text-muted-foreground">{achievements.filter((a) => a.unlocked).length}</span>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pointer-events-auto">
           <AchievementsSection achievements={achievements} habits={habits} locale={locale} />
         </CardContent>
       </Card>
