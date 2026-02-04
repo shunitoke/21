@@ -85,7 +85,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script dangerouslySetInnerHTML={{__html: `(function(){var h=document.documentElement,m=window.matchMedia,c=document.cookie.match(/program21\\.theme=([^;]+)/),t=c?c[1]:'system',b='#fff',cs='light';if(t==='dark'||(t==='system'&&m&&m('(prefers-color-scheme: dark)').matches)){b='#0a0b0f';cs='dark';}h.style.backgroundColor=b;h.style.colorScheme=cs;})();`}} />
+        <script dangerouslySetInnerHTML={{__html: `(function(){var h=document.documentElement,m=window.matchMedia,c=document.cookie.match(/program21\\.theme=([^;]+)/),t=c?c[1]:'system',b='#fff',th='light';if(t==='dark'||(t==='system'&&m&&m('(prefers-color-scheme: dark)').matches)){b='#0a0b0f';th='dark';}h.style.backgroundColor=b;h.style.colorScheme=th;h.setAttribute('data-theme',th);h.setAttribute('data-appearance',th);})();`}} />
         <link
           rel="preload"
           href="/Zvezda NHZDN Bold Italic v.1.1.ttf"

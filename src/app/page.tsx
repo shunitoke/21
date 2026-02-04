@@ -483,12 +483,6 @@ export default function Home() {
     <div
       className="app-root flex min-h-[100svh] flex-col w-full max-w-full box-border overflow-x-hidden px-4 pb-28 text-foreground"
       style={{ maxWidth: '100vw', overflowX: 'hidden', touchAction: 'pan-y', paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))', paddingBottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }}
-      onClickCapture={(event) => {
-        if (!didSwipeRef.current) return;
-        event.preventDefault();
-        event.stopPropagation();
-        didSwipeRef.current = false;
-      }}
     >
       <header className="mb-6 flex items-center justify-between gap-4 overflow-hidden" style={{ maxWidth: '100%', overflowX: 'hidden', minWidth: '0', boxSizing: 'border-box' }}>
         <div className="flex items-baseline gap-3">
@@ -567,6 +561,7 @@ export default function Home() {
           if (dragStartXRef.current === null) return;
           if (hasDialogOverlay) {
             dragStartXRef.current = null;
+            didSwipeRef.current = false;
             return;
           }
           const dx = e.clientX - dragStartXRef.current;
@@ -574,6 +569,9 @@ export default function Home() {
             handleSwipe(1);
           } else if (dx > 60) {
             handleSwipe(-1);
+          } else {
+            // Reset swipe flag if no actual swipe happened
+            didSwipeRef.current = false;
           }
           dragStartXRef.current = null;
         }}
@@ -601,8 +599,8 @@ export default function Home() {
           drag={screen === "home" || screen === "progress" || screen === "practice" ? "x" : false}
           dragListener={false}
           dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.12}
-          style={{ touchAction: "pan-y" }}
+          dragElastic={1}
+          dragMomentum={false}
         >
           {screen === "home" && (
             <HomeScreen
