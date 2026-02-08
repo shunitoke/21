@@ -1,19 +1,18 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { CSS } from "@dnd-kit/utilities";
 import {
   DndContext,
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
-  DragOverlay,
-  defaultDropAnimationSideEffects,
-  type DropAnimation,
+  MeasuringStrategy,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -48,9 +47,9 @@ interface StopCraneGridProps {
 
 interface SortableItemProps {
   item: StopCraneItem;
-  index: number;
   locale: Locale;
   imageThumbs: Record<string, string>;
+  isDragging: boolean;
   onDelete: (item: StopCraneItem) => void;
   onImagePreview: (src: string) => void;
   onTextExpand: (content: string) => void;
@@ -118,9 +117,9 @@ const PauseIcon = ({ size }: { size: number }) => (
 
 const SortableItem = ({
   item,
-  index,
   locale,
   imageThumbs,
+  isDragging,
   onDelete,
   onImagePreview,
   onTextExpand,
@@ -131,29 +130,35 @@ const SortableItem = ({
   onToggleRadio,
   wobbleClass,
 }: SortableItemProps) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging: isSortableDragging } = useSortable({ id: item.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 9999 : 1,
+    zIndex: isSortableDragging ? 9999 : 1,
     position: "relative" as const,
-    opacity: isDragging ? 0 : 1,
+    opacity: 1,
+    willChange: isSortableDragging ? "transform" as const : "auto" as const,
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={`grid gap-2 ${wobbleClass}`}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`grid gap-2 ${wobbleClass}`}
+      {...attributes}
+      {...listeners}
+    >
       <Card
-        className="transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
-        style={{ boxShadow: isDragging ? "0 25px 50px rgba(0,0,0,0.35)" : "0 4px 12px rgba(0,0,0,0.08)" }}
+        className="transition-[box-shadow,transform] duration-200 ease-out"
+        style={{
+          boxShadow: isDragging ? "0 25px 50px rgba(0,0,0,0.4)" : "0 4px 12px rgba(0,0,0,0.08)",
+          touchAction: "none",
+          cursor: isDragging ? "grabbing" : "grab",
+        }}
       >
         <CardContent className="grid gap-3 px-3">
-          <div 
-            className="flex items-center justify-between"
-            style={{ touchAction: "none", cursor: isDragging ? "grabbing" : "grab" }}
-            {...attributes}
-            {...listeners}
-          >
+          <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
               <GripVertical size={14} />
               {item.type}
@@ -162,6 +167,7 @@ const SortableItem = ({
               size="icon-sm"
               variant="outline"
               type="button"
+              onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.stopPropagation();
                 onDelete(item);
@@ -186,6 +192,7 @@ const SortableItem = ({
             <button
               type="button"
               className="overflow-hidden rounded-lg"
+              onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.stopPropagation();
                 onImagePreview(item.content);
@@ -197,6 +204,7 @@ const SortableItem = ({
             <button
               type="button"
               className={`group relative mx-auto flex h-[96px] w-[96px] items-center justify-center overflow-hidden rounded-full border border-red-700/40 bg-gradient-to-b from-red-500 via-red-600 to-red-700 shadow-[0_12px_24px_rgba(127,29,29,0.35),inset_0_2px_6px_rgba(255,255,255,0.3),inset_0_-6px_10px_rgba(0,0,0,0.22)] transition-transform active:translate-y-[2px] ${wobbleClass}`}
+              onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.stopPropagation();
                 onStartBreathing();
@@ -214,6 +222,7 @@ const SortableItem = ({
             <button
               type="button"
               className="text-left"
+              onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.stopPropagation();
                 if (item.type === "link") {
@@ -256,6 +265,12 @@ export function StopCraneGrid({
   }, [items]);
 
   const sensors = useSensors(
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
+      },
+    }),
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
@@ -263,6 +278,8 @@ export function StopCraneGrid({
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string);
     document.body.style.overflow = "hidden";
+    const root = document.querySelector<HTMLDivElement>(".app-root");
+    if (root) root.style.overflow = "hidden";
     vibrationFeedback.dragStart();
   }, []);
 
@@ -271,6 +288,8 @@ export function StopCraneGrid({
       const { active, over } = event;
       setActiveId(null);
       document.body.style.overflow = "";
+      const root = document.querySelector<HTMLDivElement>(".app-root");
+      if (root) root.style.overflow = "";
 
       if (over && active.id !== over.id) {
         const oldIndex = orderedItems.findIndex((item) => item.id === active.id);
@@ -284,11 +303,13 @@ export function StopCraneGrid({
     [orderedItems, onReorder]
   );
 
-  const dropAnimation: DropAnimation = {
-    sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: "0" } } }),
-  };
-
-  const activeItem = activeId ? orderedItems.find((item) => item.id === activeId) : null;
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = "";
+      const root = document.querySelector<HTMLDivElement>(".app-root");
+      if (root) root.style.overflow = "";
+    };
+  }, []);
 
   const wobbleClasses = ["animate-anchor-wobble", "animate-anchor-wobble-1", "animate-anchor-wobble-2", "animate-anchor-wobble-3"];
 
@@ -297,16 +318,26 @@ export function StopCraneGrid({
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      measuring={{
+        droppable: {
+          strategy: MeasuringStrategy.Always,
+        },
+      }}
+    >
       <SortableContext items={orderedItems.map((item) => item.id)} strategy={rectSortingStrategy}>
         <div ref={gridRef} className="relative grid grid-cols-2 gap-3 pb-6">
           {orderedItems.map((item, index) => (
             <SortableItem
               key={item.id}
               item={item}
-              index={index}
               locale={locale}
               imageThumbs={imageThumbs}
+              isDragging={activeId === item.id}
               onDelete={onDelete}
               onImagePreview={onImagePreview}
               onTextExpand={onTextExpand}
@@ -320,31 +351,6 @@ export function StopCraneGrid({
           ))}
         </div>
       </SortableContext>
-      <DragOverlay dropAnimation={dropAnimation}>
-        {activeItem ? (
-          <Card style={{ boxShadow: "0 25px 50px rgba(0,0,0,0.4)", transform: "scale(1.03)" }}>
-            <CardContent className="grid gap-3 px-3">
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
-                  <GripVertical size={14} />
-                  {activeItem.type}
-                </span>
-              </div>
-              {activeItem.type === "image" ? (
-                <div className="overflow-hidden rounded-lg">
-                  <img src={imageThumbs[activeItem.id] ?? activeItem.content} alt="" className="h-40 w-full object-cover" />
-                </div>
-              ) : activeItem.type === "stop" ? (
-                <div className="group relative mx-auto flex h-[96px] w-[96px] items-center justify-center overflow-hidden rounded-full border border-red-700/40 bg-gradient-to-b from-red-500 via-red-600 to-red-700">
-                  <span className="text-[24px] font-black text-white">STOP</span>
-                </div>
-              ) : (
-                <p className="text-sm leading-snug break-words line-clamp-3">{activeItem.content}</p>
-              )}
-            </CardContent>
-          </Card>
-        ) : null}
-      </DragOverlay>
     </DndContext>
   );
 }
